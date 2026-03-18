@@ -12,59 +12,70 @@
  *   US SSA, "Beyond the Top 1000 Names" — first name frequencies
  */
 
-/** US surname frequencies from Census 2010.
- *  Percentage of total US population.
- *  Top 20 surnames cover ~10% of the population.
- *  Source: census.gov/topics/population/genealogy/data/2010_surnames.html */
+/** US surname frequencies from Census 2010 API (PROP100K / 100,000).
+ *  Top 10 surnames cover ~4.9% of the US population.
+ *  Source: api.census.gov/data/2010/surname, census.gov/topics/population/genealogy */
 const US_SURNAMES: Record<string, number> = {
-  smith: 0.00881, johnson: 0.00687, williams: 0.00570, brown: 0.00541,
-  jones: 0.00508, garcia: 0.00469, miller: 0.00424, davis: 0.00398,
-  rodriguez: 0.00376, martinez: 0.00361, hernandez: 0.00339, lopez: 0.00312,
-  gonzalez: 0.00304, wilson: 0.00297, anderson: 0.00292, thomas: 0.00282,
-  taylor: 0.00278, moore: 0.00264, jackson: 0.00262, martin: 0.00260,
-  lee: 0.00255, perez: 0.00252, thompson: 0.00245, white: 0.00241,
-  harris: 0.00233, sanchez: 0.00223, clark: 0.00218, ramirez: 0.00214,
-  lewis: 0.00206, robinson: 0.00202, walker: 0.00201, young: 0.00196,
-  allen: 0.00189, king: 0.00187, wright: 0.00183, scott: 0.00179,
-  torres: 0.00178, nguyen: 0.00176, hill: 0.00175, flores: 0.00173,
-  green: 0.00171, adams: 0.00163, nelson: 0.00161, baker: 0.00158,
-  hall: 0.00155, rivera: 0.00153, campbell: 0.00150, mitchell: 0.00148,
-  carter: 0.00146, roberts: 0.00143,
+  smith: 0.00828, johnson: 0.00655, williams: 0.00551, brown: 0.00487,
+  jones: 0.00483, garcia: 0.00395, miller: 0.00394, davis: 0.00378,
+  rodriguez: 0.00371, martinez: 0.00359, hernandez: 0.00354, lopez: 0.00296,
+  gonzalez: 0.00285, wilson: 0.00272, anderson: 0.00266, thomas: 0.00256,
+  taylor: 0.00255, moore: 0.00246, jackson: 0.00240, martin: 0.00238,
+  lee: 0.00235, perez: 0.00231, thompson: 0.00225, white: 0.00224,
+  harris: 0.00212, sanchez: 0.00208, clark: 0.00191, ramirez: 0.00189,
+  lewis: 0.00180, robinson: 0.00180, walker: 0.00177, young: 0.00164,
+  allen: 0.00164, king: 0.00158, wright: 0.00156, scott: 0.00149,
+  torres: 0.00148, nguyen: 0.00148, hill: 0.00147, flores: 0.00147,
+  green: 0.00146, adams: 0.00145, nelson: 0.00144, baker: 0.00142,
+  hall: 0.00138, rivera: 0.00133, campbell: 0.00131, mitchell: 0.00130,
+  carter: 0.00128, roberts: 0.00128,
 };
 
-/** UK surname frequencies (approximate, from ONS and genealogy studies).
- *  Percentages of UK population.
- *  Jones/Smith/Williams dominate heavily in England & Wales. */
+/** UK surname frequencies from ONS electoral register data (England & Wales).
+ *  Based on ~45.6M people. Top 100 cover ~20% of the population.
+ *  Source: ONS 2002 via one-name.org/wiktionary appendix */
 const UK_SURNAMES: Record<string, number> = {
-  smith: 0.0121, jones: 0.0099, williams: 0.0072, taylor: 0.0065,
-  brown: 0.0058, davies: 0.0055, evans: 0.0047, wilson: 0.0044,
-  thomas: 0.0043, johnson: 0.0037, roberts: 0.0036, robinson: 0.0033,
-  thompson: 0.0032, wright: 0.0031, walker: 0.0030, white: 0.0029,
-  edwards: 0.0028, hughes: 0.0027, green: 0.0026, hall: 0.0025,
-  lewis: 0.0024, harris: 0.0024, clarke: 0.0023, patel: 0.0022,
-  jackson: 0.0021, wood: 0.0020, turner: 0.0019, martin: 0.0019,
-  cooper: 0.0018, hill: 0.0018,
+  smith: 0.0122, jones: 0.0093, williams: 0.0064, taylor: 0.0053,
+  brown: 0.0051, davies: 0.0047, evans: 0.0038, thomas: 0.0035,
+  wilson: 0.0034, johnson: 0.0033, roberts: 0.0032, robinson: 0.0029,
+  thompson: 0.0029, wright: 0.0028, walker: 0.0028, white: 0.0027,
+  edwards: 0.0026, hughes: 0.0025, green: 0.0025, hall: 0.0024,
+  lewis: 0.0024, harris: 0.0023, clarke: 0.0023, patel: 0.0023,
+  jackson: 0.0022, wood: 0.0022, turner: 0.0021, martin: 0.0021,
+  cooper: 0.0021, hill: 0.0021,
 };
 
-/** US first name frequencies (combined male+female, approximate).
- *  Based on SSA data — fraction of all births in recent decades.
- *  Caveat: these are birth frequencies, not current population frequencies.
- *  Current population has a mix of naming cohorts. */
+/** US first name frequencies from SSA (last 100 years of births, 1925-2024).
+ *  Values are fraction of all births (male+female combined ≈ 353M).
+ *  Caveat: birth frequencies, not living population frequencies.
+ *  Living population skews toward recent cohorts (more Liams, fewer Donalds).
+ *  Source: ssa.gov/oact/babynames/decades/century.html */
 const US_FIRST_NAMES: Record<string, number> = {
-  james: 0.0320, robert: 0.0295, john: 0.0291, michael: 0.0271,
-  david: 0.0233, william: 0.0230, richard: 0.0164, joseph: 0.0147,
-  thomas: 0.0140, christopher: 0.0120, charles: 0.0119, daniel: 0.0114,
-  matthew: 0.0110, anthony: 0.0100, mark: 0.0098, donald: 0.0093,
-  steven: 0.0090, paul: 0.0086, andrew: 0.0085, joshua: 0.0081,
-  mary: 0.0318, patricia: 0.0151, jennifer: 0.0145, linda: 0.0140,
-  barbara: 0.0116, elizabeth: 0.0113, susan: 0.0104, jessica: 0.0097,
-  sarah: 0.0088, karen: 0.0086, lisa: 0.0083, nancy: 0.0078,
-  betty: 0.0073, margaret: 0.0072, sandra: 0.0068, ashley: 0.0066,
-  dorothy: 0.0064, kimberly: 0.0063, emily: 0.0060, donna: 0.0058,
-  emma: 0.0055, olivia: 0.0052, noah: 0.0050, liam: 0.0048,
-  sophia: 0.0047, isabella: 0.0044, mason: 0.0042, ethan: 0.0040,
-  alexander: 0.0038, ava: 0.0037, mia: 0.0035, charlotte: 0.0033,
-  benjamin: 0.0032, jacob: 0.0031, giuseppe: 0.000015, // rare in US
+  // male — top 30 by SSA century count
+  james: 0.01345, robert: 0.01274, john: 0.01277, michael: 0.01232,
+  david: 0.01023, william: 0.01024, richard: 0.00726, joseph: 0.00738,
+  thomas: 0.00653, charles: 0.00597, christopher: 0.00576, daniel: 0.00569,
+  matthew: 0.00453, anthony: 0.00398, mark: 0.00381, donald: 0.00382,
+  steven: 0.00363, paul: 0.00365, andrew: 0.00360, joshua: 0.00359,
+  kenneth: 0.00347, kevin: 0.00333, brian: 0.00331, george: 0.00355,
+  timothy: 0.00303, ronald: 0.00304, edward: 0.00310, jason: 0.00283,
+  jeffrey: 0.00276, ryan: 0.00277,
+  // female — top 30
+  mary: 0.00925, patricia: 0.00445, jennifer: 0.00416, linda: 0.00411,
+  barbara: 0.00406, elizabeth: 0.00459, susan: 0.00317, jessica: 0.00296,
+  sarah: 0.00284, karen: 0.00279, lisa: 0.00273, nancy: 0.00277,
+  betty: 0.00264, margaret: 0.00268, sandra: 0.00247, ashley: 0.00214,
+  dorothy: 0.00227, kimberly: 0.00257, emily: 0.00239, donna: 0.00246,
+  michelle: 0.00230, carol: 0.00229, amanda: 0.00219, melissa: 0.00213,
+  deborah: 0.00210, stephanie: 0.00211, rebecca: 0.00209, sharon: 0.00210,
+  laura: 0.00194, cynthia: 0.00200,
+  // modern names
+  emma: 0.00160, olivia: 0.00155, noah: 0.00150, liam: 0.00145,
+  sophia: 0.00140, isabella: 0.00130, mason: 0.00120, ethan: 0.00115,
+  alexander: 0.00110, ava: 0.00105, mia: 0.00100, charlotte: 0.00095,
+  benjamin: 0.00090, jacob: 0.00088,
+  // rare names
+  giuseppe: 0.000008, // ~2,800 births over 100 years in US
 };
 
 /** UK first name frequencies (approximate from ONS birth registrations) */

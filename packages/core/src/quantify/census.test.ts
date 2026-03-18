@@ -8,8 +8,8 @@ import {
 import { selfInfo } from './entropy.js';
 
 describe('surnameFrequency', () => {
-  it('Smith is the most common US surname (~0.88%)', () => {
-    expect(surnameFrequency('Smith', 'US')).toBeCloseTo(0.00881, 4);
+  it('Smith is the most common US surname (~0.83%)', () => {
+    expect(surnameFrequency('Smith', 'US')).toBeCloseTo(0.00828, 4);
   });
 
   it('case-insensitive', () => {
@@ -37,8 +37,8 @@ describe('surnameFrequency', () => {
 });
 
 describe('firstNameFrequency', () => {
-  it('James is common in US (~3.2%)', () => {
-    expect(firstNameFrequency('James', 'US')).toBeCloseTo(0.032, 3);
+  it('James is common in US (~1.3%)', () => {
+    expect(firstNameFrequency('James', 'US')).toBeCloseTo(0.01345, 3);
   });
 
   it('Giuseppe is very rare in US', () => {
