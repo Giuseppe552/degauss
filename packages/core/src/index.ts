@@ -5,7 +5,7 @@ export {
   anonymitySetSize,
   selfInfo,
   independentExposure,
-  conditionalMI,
+  heuristicExposure,
   uniquenessThreshold,
   isUnique,
   uniqueProbability,
@@ -27,9 +27,17 @@ export {
   findComponents,
   computeMaxFlow,
   findMinCut,
+  findMinVertexCut,
 } from './quantify/graph.js';
 
 export { generateReport } from './quantify/report.js';
+
+export {
+  surnameFrequency,
+  firstNameFrequency,
+  fullNameFrequency,
+  zipFrequency,
+} from './quantify/census.js';
 
 // strategy — record linkage
 export {

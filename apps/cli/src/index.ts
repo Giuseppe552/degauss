@@ -133,8 +133,8 @@ function cmdScore(flags: Record<string, string>): void {
   if (report.attributes.length > 0) {
     console.error(`\n${BOLD}  Per-attribute exposure:${RESET}`);
     for (const attr of report.attributes.slice(0, 10)) {
-      const bar = '█'.repeat(Math.min(Math.round(attr.conditionalMI), 30));
-      console.error(`    ${attr.field.padEnd(15)} ${CYAN}${attr.conditionalMI.toFixed(1).padStart(5)} bits${RESET}  ${DIM}${bar}${RESET}  ${DIM}(${attr.sourceCount} sources)${RESET}`);
+      const bar = '█'.repeat(Math.min(Math.round(attr.exposureBits), 30));
+      console.error(`    ${attr.field.padEnd(15)} ${CYAN}${attr.exposureBits.toFixed(1).padStart(5)} bits${RESET}  ${DIM}${bar}${RESET}  ${DIM}(${attr.sourceCount} sources)${RESET}`);
     }
   }
 

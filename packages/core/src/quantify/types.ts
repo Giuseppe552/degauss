@@ -75,7 +75,7 @@ export interface AttributeExposure {
   field: QIField;
   /** how many bits this attribute contributes to identification,
    * conditional on what the adversary already knows */
-  conditionalMI: number;
+  exposureBits: number;
   /** how many sources expose this attribute */
   sourceCount: number;
   /** estimated cost/difficulty of removal (0-1 scale) */

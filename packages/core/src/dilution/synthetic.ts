@@ -139,7 +139,7 @@ export function generateSyntheticProfiles(
     // generate other fields
     if (!anchors.includes('email') && realProfile.first_name && realProfile.last_name) {
       const name = (realProfile.first_name ?? 'user').toLowerCase();
-      const domain = pickRandom(['gmail.com', 'outlook.com', 'yahoo.com', 'proton.me', 'icloud.com']);
+      const domain = pickBySeed(['gmail.com', 'outlook.com', 'yahoo.com', 'proton.me', 'icloud.com'], i);
       fields.email = `${name}.${loc.city.toLowerCase()}${i}@${domain}`;
       randomised.push('email');
     }
@@ -207,15 +207,24 @@ export function dilutionEntropyGain(kBefore: number, kAfter: number): number {
   return Math.log2(kAfter) - Math.log2(kBefore);
 }
 
+/** Generate a plausible phone number deterministically from seed. */
 function generatePhone(country: string, seed: number): string {
-  const base = seed * 7919 + 1000000; // deterministic but spread
+  // LCG to spread seeds across the number space
+  const h = ((seed + 1) * 2654435761) >>> 0; // Knuth multiplicative hash
   if (country === 'UK') {
-    return `+44 7${String(base).slice(0, 3)} ${String(base).slice(3, 6)} ${String(base).slice(6, 9)}`;
+    // UK mobile: +44 7XXX XXXXXX (11 digits after +44)
+    const n = 7000000000 + (h % 999999999);
+    const s = String(n);
+    return `+44 ${s.slice(0, 4)} ${s.slice(4, 7)} ${s.slice(7)}`;
   }
-  return `+1 ${String(base).slice(0, 3)}-${String(base).slice(3, 6)}-${String(base).slice(6, 10)}`;
+  // US: +1 XXX-XXX-XXXX
+  const area = 200 + (h % 800); // valid US area codes start at 200
+  const exch = 200 + ((h >>> 10) % 800);
+  const sub = (h >>> 20) % 10000;
+  return `+1 ${area}-${String(exch).padStart(3, '0')}-${String(sub).padStart(4, '0')}`;
 }
 
-function pickRandom<T>(arr: T[]): T {
-  // deterministic for reproducibility in tests
-  return arr[Math.floor(Math.random() * arr.length)];
+/** Deterministic pick from array by seed. No Math.random(). */
+function pickBySeed<T>(arr: T[], seed: number): T {
+  return arr[((seed * 2654435761) >>> 0) % arr.length];
 }

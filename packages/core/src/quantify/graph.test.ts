@@ -4,6 +4,7 @@ import {
   findComponents,
   computeMaxFlow,
   findMinCut,
+  findMinVertexCut,
 } from './graph.js';
 import type { ExposureRecord } from './types.js';
 
@@ -156,5 +157,55 @@ describe('findMinCut', () => {
     const cutCapacity = cutIndices.reduce((sum, i) => sum + edges[i].mutualInfo, 0);
     // min-cut capacity should equal max-flow
     expect(cutCapacity).toBeCloseTo(mf, 5);
+  });
+});
+
+describe('findMinVertexCut', () => {
+  it('returns empty for no edges', () => {
+    expect(findMinVertexCut(3, [])).toEqual([]);
+  });
+
+  it('finds bottleneck node in a chain', () => {
+    // 0 --10--> 1 --10--> 2  (node 1 is the bottleneck)
+    const edges = [
+      { from: 0, to: 1, linkingFields: ['email' as const], mutualInfo: 10 },
+      { from: 1, to: 2, linkingFields: ['phone' as const], mutualInfo: 10 },
+    ];
+    const cut = findMinVertexCut(3, edges);
+    // node 1 is the only internal node; cutting it disconnects 0 from 2
+    expect(cut).toContain(1);
+  });
+
+  it('does not include source or sink in vertex cut', () => {
+    const edges = [
+      { from: 0, to: 1, linkingFields: ['email' as const], mutualInfo: 5 },
+      { from: 1, to: 2, linkingFields: ['phone' as const], mutualInfo: 5 },
+      { from: 0, to: 2, linkingFields: ['full_name' as const], mutualInfo: 5 },
+    ];
+    const cut = findMinVertexCut(3, edges);
+    // source and sink (two highest-weight nodes) should not appear
+    // all 3 nodes have equal weight so source=0, sink=1 by stability
+    for (const v of cut) {
+      expect(v).not.toBe(0);
+      expect(v).not.toBe(1);
+    }
+  });
+
+  it('returns multiple vertices when needed', () => {
+    // hourglass: 0→1, 0→2, 1→3, 2→3, 3→4, 3→5
+    // nodes 0 and 4 are leaves (degree 1) → source=0, sink=4
+    // to disconnect 0 from 4, must cut node 3 at minimum
+    const edges = [
+      { from: 0, to: 1, linkingFields: ['email' as const], mutualInfo: 10 },
+      { from: 0, to: 2, linkingFields: ['phone' as const], mutualInfo: 10 },
+      { from: 1, to: 3, linkingFields: ['full_name' as const], mutualInfo: 10 },
+      { from: 2, to: 3, linkingFields: ['city' as const], mutualInfo: 10 },
+      { from: 3, to: 4, linkingFields: ['zip' as const], mutualInfo: 10 },
+      { from: 3, to: 5, linkingFields: ['dob' as const], mutualInfo: 10 },
+    ];
+    const cut = findMinVertexCut(6, edges);
+    // node 3 is the bottleneck
+    expect(cut.length).toBeGreaterThanOrEqual(1);
+    expect(cut).toContain(3);
   });
 });

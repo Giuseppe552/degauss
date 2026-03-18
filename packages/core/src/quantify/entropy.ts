@@ -53,15 +53,13 @@ export function anonymitySetSize(entropyBits: number): number {
  *  A name shared by 1 in 10 contributes ~3.3 bits. */
 export function selfInfo(frequency: number): number {
   if (frequency <= 0 || frequency >= 1) return 0;
-  if (frequency === 1) return 0;
   return -Math.log(frequency) / LN2;
 }
 
 /** Joint self-information of independent quasi-identifiers.
  *  If QIs are independent: I(q1, q2, ...) = Σ I(qi)
  *  This OVERESTIMATES exposure when QIs are correlated
- *  (name correlates with ethnicity, ZIP correlates with income).
- *  Use conditionalExposure() for correlated QIs. */
+ *  (name correlates with ethnicity, ZIP correlates with income). */
 export function independentExposure(frequencies: number[]): number {
   let total = 0;
   for (const f of frequencies) {
@@ -70,26 +68,22 @@ export function independentExposure(frequencies: number[]): number {
   return total;
 }
 
-/** Conditional mutual information: I(Identity; QI_new | QIs_known).
- *  How many additional bits does QI_new reveal, given what the adversary
- *  already knows from QIs_known?
+/** Heuristic exposure contribution of a new QI given existing ones.
  *
- *  Under independence assumption:
- *    I(Identity; QI_new | QIs_known) = I(QI_new) = selfInfo(freq_new)
+ *  NOT true conditional mutual information — computing I(Identity; QI_new | QIs_known)
+ *  requires the joint distribution P(Identity, QI_new, QIs_known), which we don't have.
  *
- *  With correlation factor ρ (0=independent, 1=fully redundant):
- *    I_cond ≈ selfInfo(freq_new) × (1 - ρ)
+ *  Instead: dampen by a pairwise correlation factor ρ estimated from population
+ *  structure. ρ=0 means independent (full contribution), ρ=1 means redundant (zero).
  *
- *  The correlation factor should be estimated from population data.
- *  Without population data, we use field-level heuristic correlations. */
-export function conditionalMI(
+ *  This is a conservative upper bound when ρ is underestimated —
+ *  overestimating exposure is safer than underestimating it. */
+export function heuristicExposure(
   newFreq: number,
-  knownFreqs: number[],
   correlationFactor: number = 0
 ): number {
   const raw = selfInfo(newFreq);
-  const dampened = raw * (1 - Math.min(correlationFactor, 0.99));
-  return dampened;
+  return raw * (1 - Math.min(correlationFactor, 0.99));
 }
 
 /** Uniqueness threshold: log₂(N) bits needed to identify one person
@@ -106,33 +100,41 @@ export function isUnique(totalBits: number, populationSize: number): boolean {
   return totalBits >= uniquenessThreshold(populationSize);
 }
 
-/** Probability of unique identification given exposed bits and population.
- *  Under uniform assumption: P(unique) ≈ 1 - e^(-2^(bits - log₂N))
- *  This follows from the birthday problem generalisation. */
+/** Estimated probability of unique identification.
+ *
+ *  Given B bits of exposed quasi-identifiers and a population of N:
+ *    - If B < log₂(N): expected group size ≈ N / 2^B, P(unique) is low
+ *    - If B ≈ log₂(N): transition zone
+ *    - If B > log₂(N): expected group size < 1, almost certainly unique
+ *
+ *  We model this as P(unique) ≈ 1 - e^(-2^(B - log₂N)).
+ *  This is a sigmoid-like heuristic — NOT derived from the birthday problem.
+ *  It has the right asymptotic behaviour: approaches 0 for B << log₂N,
+ *  approaches 1 for B >> log₂N, and transitions near B = log₂N. */
 export function uniqueProbability(totalBits: number, populationSize: number): number {
   const threshold = uniquenessThreshold(populationSize);
   const excess = totalBits - threshold;
-  if (excess < -10) return 0; // far from unique
-  if (excess > 10) return 1;  // overwhelmingly unique
-  // birthday approximation: expected collisions ≈ N / 2^bits
-  // P(unique) ≈ 1 - exp(-1 / (2^excess))
+  if (excess < -10) return 0;
+  if (excess > 10) return 1;
   return 1 - Math.exp(-Math.pow(2, excess));
 }
 
 /** Marginal privacy gain from removing a quasi-identifier.
- *  ΔH = I(Identity; QI_removed | remaining QIs)
- *  This is the number of bits the adversary LOSES. */
+ *  Approximate: selfInfo(freq) × (1 - correlation with remaining QIs). */
 export function removalGain(
   removedFreq: number,
   correlationWithRemaining: number = 0
 ): number {
-  return conditionalMI(removedFreq, [], correlationWithRemaining);
+  return heuristicExposure(removedFreq, correlationWithRemaining);
 }
 
-/** Submodular greedy ordering: sort attributes by efficiency
+/** Greedy removal ordering: sort attributes by efficiency
  *  (bits reduced per unit of removal difficulty).
- *  Greedy achieves (1-1/e) ≈ 63% of optimal for submodular functions.
- *  Krause & Golovin, "Submodular Function Maximization" (2014). */
+ *
+ *  If the exposure function is submodular (diminishing returns from
+ *  each additional removal), greedy achieves (1-1/e) ≈ 63% of optimal.
+ *  We don't prove submodularity here — the guarantee is aspirational.
+ *  Krause & Golovin, "Submodular Function Maximization" in Tractability (2014). */
 export function greedyRemovalOrder(
   attributes: Array<{ bits: number; difficulty: number }>
 ): number[] {
@@ -140,7 +142,7 @@ export function greedyRemovalOrder(
   indices.sort((a, b) => {
     const effA = attributes[a].bits / Math.max(attributes[a].difficulty, 0.01);
     const effB = attributes[b].bits / Math.max(attributes[b].difficulty, 0.01);
-    return effB - effA; // descending efficiency
+    return effB - effA;
   });
   return indices;
 }

@@ -5,7 +5,7 @@ import {
   anonymitySetSize,
   selfInfo,
   independentExposure,
-  conditionalMI,
+  heuristicExposure,
   uniquenessThreshold,
   isUnique,
   uniqueProbability,
@@ -154,17 +154,17 @@ describe('uniqueProbability', () => {
   });
 });
 
-describe('conditionalMI', () => {
+describe('heuristicExposure', () => {
   it('equals selfInfo when correlation is 0', () => {
-    expect(conditionalMI(0.001, [], 0)).toBeCloseTo(selfInfo(0.001), 10);
+    expect(heuristicExposure(0.001, 0)).toBeCloseTo(selfInfo(0.001), 10);
   });
 
   it('approaches 0 as correlation approaches 1', () => {
-    expect(conditionalMI(0.001, [], 0.99)).toBeLessThan(0.15);
+    expect(heuristicExposure(0.001, 0.99)).toBeLessThan(0.15);
   });
 
   it('is non-negative', () => {
-    expect(conditionalMI(0.5, [0.5, 0.5], 0.3)).toBeGreaterThanOrEqual(0);
+    expect(heuristicExposure(0.5, 0.3)).toBeGreaterThanOrEqual(0);
   });
 });
 

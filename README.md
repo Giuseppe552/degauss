@@ -1,6 +1,6 @@
 # degauss
 
-[![Tests: 119](https://img.shields.io/badge/tests-119_passing-brightgreen)]()
+[![Tests: 146](https://img.shields.io/badge/tests-146_passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Identity attack surface reduction through information theory. Measures how identifiable you are, computes the mathematically optimal removal strategy, generates legal requests, and predicts when removed data will reappear.
@@ -47,19 +47,29 @@ Every command outputs JSON to stdout. Pipe into `jq`, Python, anything.
 
 ## The maths
 
+**Established theory** (standard information theory and graph algorithms):
+
 | Concept | Method | Reference |
 |---------|--------|-----------|
 | Exposure quantification | Shannon entropy, self-information per QI | Shannon (1948), Sweeney (2000) |
+| Name frequencies | US Census 2010 surname data, SSA first names | census.gov |
 | Uniqueness threshold | log₂(N) bits for population N | Golle (2006) |
 | Anonymity set | 2^H — effective group size from entropy | Díaz et al. (2002, PET) |
-| Identity graph | Records as nodes, linking QIs as edges | Fellegi & Sunter (1969) |
-| Optimal removal | Min vertex cut via max-flow (Ford-Fulkerson) | Menger's theorem |
-| Removal ordering | Submodular greedy, (1-1/e) approximation | Krause & Golovin (2014) |
 | Record linkage | Fellegi-Sunter log-likelihood ratios | Fellegi & Sunter (1969, JASA) |
 | String matching | Jaro-Winkler similarity | Jaro (1989), Winkler (2006) |
-| Re-emergence | Exponential model of broker refresh cycles | Markov process |
+| Max-flow / min-cut | Edmonds-Karp algorithm | Edmonds & Karp (1972, JACM) |
 | Data dilution | Synthetic profiles for k-anonymity | Sweeney (2002), Howe & Nissenbaum (2009) |
 | Legal requests | GDPR Art 17, UK DPA, CCPA §1798.105, DMCA §512(c)(3) | — |
+
+**Our constructions** (heuristic models, not peer-reviewed):
+
+| Concept | What it does | Caveat |
+|---------|-------------|--------|
+| Identity graph | Records as nodes, linking QIs as weighted edges | Novel framing — Fellegi-Sunter doesn't use graph models |
+| Exposure via min-cut | Uses max-flow to estimate adversarial linkage power | Plausible heuristic, not a proven bound |
+| Correlation damping | Pairwise ρ factors between QI fields | Simplified — real correlations are value-dependent |
+| Re-emergence model | Exponential decay with broker-specific λ | Parameters are estimates, not calibrated against data |
+| Removal ordering | Greedy by bits/difficulty | Assumes submodularity (not proven for this objective) |
 
 <details>
 <summary><strong>How the exposure score works</strong></summary>
@@ -131,7 +141,7 @@ apps/cli/         7 commands, coloured output, JSON piping
 
 ```sh
 npm install && npm run build
-cd packages/core && npm test   # 119 tests
+cd packages/core && npm test   # 146 tests
 ```
 
 ## Origin

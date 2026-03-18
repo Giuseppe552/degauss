@@ -20,6 +20,12 @@
 
 import type { QIField, PopulationModel, FrequencyDistribution } from './types.js';
 import { shannonEntropy } from './entropy.js';
+import {
+  surnameFrequency,
+  firstNameFrequency,
+  fullNameFrequency,
+  zipFrequency,
+} from './census.js';
 
 /** Default population sizes by country */
 const POPULATIONS: Record<string, number> = {
@@ -118,13 +124,30 @@ export function populationModel(country: string = 'UK'): PopulationModel {
 }
 
 /** Compute the effective frequency of a value for a QI field.
- *  If the exact frequency is known (from population data), use it.
- *  Otherwise, estimate from the field's entropy: f ≈ 2^(-H_field).
- *  This is a worst-case estimate (assumes uniform distribution). */
+ *
+ *  When a value is provided, uses census data for value-specific lookup:
+ *    estimateFrequency('last_name', 'Smith') → 0.00881  (US Census 2010)
+ *    estimateFrequency('last_name', 'Giona') → 0.000005 (long tail)
+ *
+ *  Without a value, falls back to the field's heuristic entropy: f ≈ 2^(-H).
+ *  This underestimates exposure for rare values (conservative). */
 export function estimateFrequency(field: QIField, value?: string): number {
-  // for effectively-unique fields, frequency ≈ 1/N
-  const h = fieldEntropy(field);
-  return Math.pow(2, -h);
+  if (value) {
+    switch (field) {
+      case 'full_name':
+        return fullNameFrequency(value);
+      case 'first_name':
+        return firstNameFrequency(value);
+      case 'last_name':
+        return surnameFrequency(value);
+      case 'zip':
+        return zipFrequency(value);
+      default:
+        break;
+    }
+  }
+  // fallback: heuristic from field entropy
+  return Math.pow(2, -fieldEntropy(field));
 }
 
 /** Compute total exposure bits from a set of observed QI fields,

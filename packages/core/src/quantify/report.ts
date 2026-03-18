@@ -152,7 +152,7 @@ export function generateReport(
 
     return {
       field,
-      conditionalMI: cmi,
+      exposureBits: cmi,
       sourceCount: sources,
       removalDifficulty: minDifficulty,
       efficiency,
@@ -211,7 +211,7 @@ function buildRemovalPlan(
     let bits = 0;
     for (const f of fields) {
       const attr = attributes.find(a => a.field === f);
-      if (attr) bits += attr.conditionalMI;
+      if (attr) bits += attr.exposureBits;
     }
 
     const difficulty = SOURCE_DIFFICULTY[rec.source.toLowerCase()] ?? 0.5;
