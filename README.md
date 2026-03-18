@@ -188,7 +188,7 @@ Synthetic profiles are internally consistent (city matches ZIP, area code matche
 packages/core/
   quantify/       entropy, census data, identity graph, exposure reports
   discovery/      broker scanning, supply chain graph, HIBP breaches, canary tokens
-  strategy/       Fellegi-Sunter linkage, Jaro-Winkler, social engineering analysis
+  strategy/       Fellegi-Sunter linkage, Jaro-Winkler, attack feasibility assessment
   legal/          GDPR, UK DPA, CCPA, DMCA request generation
   monitor/        re-emergence prediction, monitoring schedules
   dilution/       synthetic profile generation, k-anonymity computation
@@ -202,9 +202,9 @@ Nobody else models the broker ecosystem as a directed graph. Brokers don't opera
 
 degauss maps the known supply chain (21 nodes, 26 edges) and computes the optimal upstream removal strategy using weighted set cover. One upstream removal can cascade downstream, making multiple leaf removals unnecessary.
 
-### Social engineering playbook
+### Attack feasibility assessment
 
-Given your exposed QIs, degauss computes which social engineering attacks become feasible. 11 attack scenarios (SIM swap, bank pretexting, spear phishing, doxxing, tax fraud, etc.), each with required QIs, impact severity, and specific mitigations. Turns abstract "bits of exposure" into "here's how you get owned."
+Given your exposed data, degauss computes which attack vectors become feasible against you. 11 scenarios (SIM swap, bank pretexting, spear phishing, credential stuffing, doxxing, tax fraud, etc.), each showing what data the attacker needs, impact severity, and specific defensive mitigations. Turns abstract "bits of exposure" into concrete risks with actionable fixes.
 
 ### Canary tokens
 
