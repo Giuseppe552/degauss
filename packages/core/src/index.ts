@@ -65,6 +65,43 @@ export {
   dilutionEntropyGain,
 } from './dilution/synthetic.js';
 
+// discovery — automated scanning, supply chain, breaches, canaries
+export {
+  SCAN_TARGETS,
+  buildSearchUrl,
+  extractQIs,
+  scanTarget,
+  scanAll,
+  resultsToRecords,
+} from './discovery/scraper.js';
+
+export {
+  getSupplyChain,
+  findUpstream,
+  findDownstream,
+  computeUpstreamStrategy,
+} from './discovery/supplychain.js';
+
+export {
+  checkBreaches,
+  checkPassword,
+  checkMultipleBreaches,
+} from './discovery/breaches.js';
+
+export {
+  createUrlCanary,
+  createEmailCanary,
+  createDnsCanary,
+  createCanarySet,
+  canaryStats,
+} from './discovery/canary.js';
+
+// strategy — social engineering analysis
+export {
+  analyseAttackSurface,
+  attackSummary,
+} from './strategy/socialeng.js';
+
 // types
 export type {
   QuasiIdentifier,

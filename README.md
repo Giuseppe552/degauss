@@ -1,6 +1,6 @@
 # degauss
 
-[![Tests: 146](https://img.shields.io/badge/tests-146_passing-brightgreen)]()
+[![Tests: 189](https://img.shields.io/badge/tests-189_passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Identity attack surface reduction through information theory. Measures how identifiable you are, computes the mathematically optimal removal strategy, generates legal requests, and predicts when removed data will reappear.
@@ -108,14 +108,29 @@ Synthetic profiles are internally consistent (city matches ZIP, area code matche
 
 ```
 packages/core/
-  quantify/       entropy, population models, identity graph, exposure reports
-  strategy/       Fellegi-Sunter record linkage, Jaro-Winkler similarity
+  quantify/       entropy, census data, identity graph, exposure reports
+  discovery/      broker scanning, supply chain graph, HIBP breaches, canary tokens
+  strategy/       Fellegi-Sunter linkage, Jaro-Winkler, social engineering analysis
   legal/          GDPR, UK DPA, CCPA, DMCA request generation
   monitor/        re-emergence prediction, monitoring schedules
   dilution/       synthetic profile generation, k-anonymity computation
 
 apps/cli/         7 commands, coloured output, JSON piping
 ```
+
+### Data broker supply chain
+
+Nobody else models the broker ecosystem as a directed graph. Brokers don't operate independently — Acxiom feeds Spokeo, LexisNexis feeds BeenVerified, public records feed everyone. Removing from a leaf broker is pointless if the upstream source still has the data.
+
+degauss maps the known supply chain (21 nodes, 26 edges) and computes the optimal upstream removal strategy using weighted set cover. One upstream removal can cascade downstream, making multiple leaf removals unnecessary.
+
+### Social engineering playbook
+
+Given your exposed QIs, degauss computes which social engineering attacks become feasible. 11 attack scenarios (SIM swap, bank pretexting, spear phishing, doxxing, tax fraud, etc.), each with required QIs, impact severity, and specific mitigations. Turns abstract "bits of exposure" into "here's how you get owned."
+
+### Canary tokens
+
+Offensive privacy. Generate unique URLs and email addresses, embed them in your broker profiles as "contact" links. When someone accesses a canary, you know someone is researching you — when, from where, and sometimes who.
 
 ## Profile format
 
@@ -141,7 +156,7 @@ apps/cli/         7 commands, coloured output, JSON piping
 
 ```sh
 npm install && npm run build
-cd packages/core && npm test   # 146 tests
+cd packages/core && npm test   # 189 tests
 ```
 
 ## Origin
