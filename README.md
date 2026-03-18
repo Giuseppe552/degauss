@@ -24,7 +24,12 @@ npm install && npm run build
 ```sh
 # scan brokers → score exposure → analyse attacks → map supply chain → build removal plan
 degauss me --name "Jane Doe" --city Portland --state OR --email jane@mail.com
+
+# or with a manually-built profile (when automated scanning is blocked)
+degauss me --name "Jane Doe" --profile my-exposure.json --email jane@mail.com
 ```
+
+**Scanning limitation:** Most data brokers use Cloudflare to block Tor exit nodes and automated scrapers. The automated scan will attempt all targets through Tor (your IP stays hidden) but may return 0 results. In that case, build your profile manually — search the brokers in an incognito window, note what you find, and feed it to degauss as JSON. The scoring, attack analysis, and removal planning work regardless of how the profile was built.
 
 Output:
 ```

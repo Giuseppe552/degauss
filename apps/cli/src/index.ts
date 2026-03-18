@@ -112,8 +112,11 @@ function usage(): void {
   console.log(`
 ${B}degauss${R} — identity attack surface reduction
 
+${D}Full pipeline:${R}
+  ${CYN}me${R}            ${D}scan + score + attacks + supply chain + plan (one command)${R}
+
 ${D}Discovery:${R}
-  ${CYN}scan${R}          ${D}scan data brokers for your PII (auto-builds profile)${R}
+  ${CYN}scan${R}          ${D}scan data brokers (Tor required, Cloudflare may block)${R}
   ${CYN}serp${R}          ${D}analyse Google search results for your name${R}
   ${CYN}breaches${R}      ${D}check emails against HIBP breach database${R}
   ${CYN}archive${R}       ${D}check Wayback Machine for cached broker pages${R}
@@ -774,14 +777,18 @@ async function cmdMe(flags: Record<string, string>): Promise<void> {
   // ── step 2: score exposure ──
   console.error(`${B}[2/5] Computing exposure score...${R}`);
   if (records.length === 0 && !flags.profile) {
-    console.error(`\n  ${YEL}No records found via scan.${R}`);
-    console.error(`  ${D}This usually means: broker HTML patterns need updating, or JS-rendered sites were skipped.${R}`);
-    console.error(`  ${D}Try: degauss scan --name "${name}" --clearnet --browser${R}`);
-    console.error(`  ${D}Or create a profile manually: degauss score --profile profile.json${R}\n`);
-    console.log(JSON.stringify({ records: [], note: 'no broker records found via scan' }));
+    console.error(`\n  ${YEL}No records found via automated scan.${R}`);
+    console.error(`  ${D}Most brokers block Tor exit nodes with Cloudflare. This is expected.${R}`);
+    console.error(`  ${D}To build your profile manually (takes 5 minutes):${R}`);
+    console.error(`    ${D}1. Open an incognito browser window${R}`);
+    console.error(`    ${D}2. Search your name on spokeo.com, whitepages.com, beenverified.com${R}`);
+    console.error(`    ${D}3. Create a profile JSON with what you find (see examples/sample-profile.json)${R}`);
+    console.error(`    ${D}4. Run: degauss me --name "${name}" --profile your-profile.json${R}\n`);
+    console.log(JSON.stringify({ records: [], note: 'no broker records found — create a profile JSON or try --clearnet' }));
     return;
   }
-  const report = generateReport(records.length > 0 ? records : parseProfile(readJsonFile(flags.profile!)), country);
+  const profileRecords = flags.profile ? parseProfile(readJsonFile(flags.profile)) : records;
+  const report = generateReport(profileRecords, country);
 
   const expColor = report.uniquelyIdentifiable ? RED : GRN;
   console.error(`  Exposure: ${B}${report.totalBits.toFixed(1)} bits${R} (threshold: ${report.uniquenessThreshold.toFixed(1)})`);
