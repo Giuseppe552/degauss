@@ -137,11 +137,15 @@ ${D}Monitoring:${R}
   ${CYN}watch${R}         ${D}continuous monitoring (single scan + delta)${R}
   ${CYN}history${R}       ${D}show exposure trend over time${R}
 
-${D}Quick start:${R}
+${D}Quick start — one command does everything:${R}
+  ${B}degauss me --name "Jane Doe" --city Portland --state OR --email jane@mail.com${R}
+
+${D}Or step by step:${R}
   degauss scan --name "Jane Doe" --city Portland --state OR
-  degauss attacks --name "Jane Doe" --city Portland
-  degauss request --source spokeo --fields full_name,email --name "Jane Doe" --email you@mail.com
-  degauss watch --name "Jane Doe" --country US
+  degauss attacks
+  degauss plan
+  degauss request --source spokeo --fields full_name,email --name "Jane Doe" --email jane@mail.com
+  degauss watch
 
 ${D}All commands output JSON to stdout. Pipe into jq, python, anything.${R}
 `);
@@ -712,6 +716,120 @@ function cmdDilute(flags: Record<string, string>): void {
   console.log(JSON.stringify({ k, entropyGain: gain, profiles }, null, 2));
 }
 
+// ─── me (full pipeline) ───────────────────────────────────────────────
+async function cmdMe(flags: Record<string, string>): Promise<void> {
+  const name = requireFlag(flags, 'name', 'your full name');
+  const email = flags.email;
+  const city = flags.city;
+  const st = flags.state;
+  const country = flags.country ?? 'US';
+
+  console.error(`\n${B}degauss: full exposure analysis${R}`);
+  console.error(`${D}═══════════════════════════════════════════════════${R}`);
+  console.error(`  Target: ${name}${city ? `, ${city}` : ''}${st ? `, ${st}` : ''}`);
+  console.error(`  Country: ${country}\n`);
+
+  // ── step 1: scan brokers ──
+  console.error(`${B}[1/5] Scanning data brokers...${R}`);
+  const scanResults = await scanAll({ name, city, state: st, skipJS: true });
+  const records = resultsToRecords(scanResults);
+  const foundCount = scanResults.filter(r => r.found).length;
+  console.error(`  Found on ${RED}${foundCount}${R} of ${scanResults.length} brokers (${records.reduce((s, r) => s + r.qis.length, 0)} QIs extracted)\n`);
+
+  // ── step 2: score exposure ──
+  console.error(`${B}[2/5] Computing exposure score...${R}`);
+  const report = generateReport(records.length > 0 ? records : parseProfile(readJsonFile(flags.profile ?? 'examples/sample-profile.json')), country);
+
+  const expColor = report.uniquelyIdentifiable ? RED : GRN;
+  console.error(`  Exposure: ${B}${report.totalBits.toFixed(1)} bits${R} (threshold: ${report.uniquenessThreshold.toFixed(1)})`);
+  console.error(`  Anonymity set: ${expColor}${report.anonymitySet}${R}`);
+  console.error(`  ${expColor}${report.uniquelyIdentifiable ? 'YOU ARE UNIQUELY IDENTIFIABLE' : 'Not uniquely identifiable'}${R}\n`);
+
+  if (report.attributes.length > 0) {
+    console.error(`  ${D}Top exposures:${R}`);
+    for (const attr of report.attributes.slice(0, 5)) {
+      console.error(`    ${attr.field.padEnd(15)} ${CYN}${attr.exposureBits.toFixed(1)} bits${R} (${attr.sourceCount} sources)`);
+    }
+    console.error();
+  }
+
+  // ── step 3: attack surface ──
+  console.error(`${B}[3/5] Analysing attack surface...${R}`);
+  const fields = [...new Set(records.flatMap(r => r.qis.map(q => q.field)))];
+  const scenarios = analyseAttackSurface(fields);
+  const summary = attackSummary(scenarios);
+  console.error(`  Feasible attacks: ${RED}${summary.fullyFeasible}${R} (${summary.criticalFeasible} critical)`);
+
+  for (const threat of summary.topThreats) {
+    const tc = threat.impact === 'critical' ? RED : YEL;
+    console.error(`    ${tc}${threat.impact.toUpperCase()}${R} ${threat.name} (${(threat.feasibility * 100).toFixed(0)}% feasible)`);
+  }
+  console.error();
+
+  // ── step 4: supply chain ──
+  console.error(`${B}[4/5] Mapping data supply chain...${R}`);
+  const leafBrokers = records.map(r => r.source);
+  if (leafBrokers.length > 0) {
+    const strategy = computeUpstreamStrategy(leafBrokers);
+    console.error(`  ${strategy.removalOrder.length} upstream removal(s) would cascade to ${strategy.totalCascade} sources`);
+    for (const node of strategy.removalOrder.slice(0, 3)) {
+      const cascade = strategy.cascadeMap.get(node.id) ?? [];
+      console.error(`    ${CYN}${node.name}${R} → cascades to ${cascade.join(', ')}`);
+    }
+  } else {
+    console.error(`  ${D}No broker records to trace${R}`);
+  }
+  console.error();
+
+  // ── step 5: removal plan ──
+  console.error(`${B}[5/5] Building removal plan...${R}`);
+  if (report.removalPlan.length > 0) {
+    for (let i = 0; i < Math.min(report.removalPlan.length, 5); i++) {
+      const step = report.removalPlan[i];
+      console.error(`  ${B}${i + 1}.${R} Remove from ${CYN}${step.source}${R} (${step.jurisdiction}) — ${GRN}-${step.bitsReduced} bits${R}`);
+    }
+  } else {
+    console.error(`  ${GRN}No removals needed${R}`);
+  }
+
+  // ── generate requests if email provided ──
+  if (email && report.removalPlan.length > 0) {
+    console.error(`\n${B}Generating removal requests...${R}`);
+    for (const step of report.removalPlan) {
+      const req = generateRequest(
+        { fullName: name, email, country },
+        step.source, step.fields, undefined, undefined
+      );
+      console.error(`  ${GRN}✓${R} ${req.jurisdiction.toUpperCase()} request for ${step.source} → ${req.recipient}`);
+    }
+    console.error(`\n${D}  Run 'degauss request --source <name> --fields <fields> --name "${name}" --email "${email}"' to see each request${R}`);
+  }
+
+  // ── save state ──
+  const state = loadState() ?? createState({ name, city, state: st, country });
+  const snapshot: ExposureSnapshot = {
+    date: new Date().toISOString(),
+    totalBits: report.totalBits,
+    anonymitySet: report.anonymitySet,
+    recordCount: records.length,
+    activeSources: records.map(r => r.source),
+  };
+  saveState(updateState(state, records, snapshot));
+
+  // ── summary ──
+  console.error(`\n${B}═══════════════════════════════════════════════════${R}`);
+  console.error(`${B}Summary${R}`);
+  console.error(`  Exposure:     ${report.totalBits.toFixed(1)} bits`);
+  console.error(`  Anonymity:    ${report.anonymitySet} people`);
+  console.error(`  Attacks:      ${summary.fullyFeasible} feasible (${summary.criticalFeasible} critical)`);
+  console.error(`  Brokers:      ${foundCount} with your data`);
+  console.error(`  Next step:    ${report.removalPlan[0] ? `remove from ${report.removalPlan[0].source}` : 'none'}`);
+  console.error(`${D}\n  State saved to ${STATE_FILE}`);
+  console.error(`  Run 'degauss watch' to monitor changes over time${R}\n`);
+
+  console.log(JSON.stringify({ report, attacks: summary, supplyChain: leafBrokers.length > 0 ? computeUpstreamStrategy(leafBrokers) : null }, null, 2));
+}
+
 // ─── main ─────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 
@@ -724,6 +842,7 @@ const { command, flags } = parseArgs(args);
 
 // async commands need top-level await wrapper
 const asyncCommands: Record<string, (f: Record<string, string>) => Promise<void>> = {
+  me: cmdMe,
   scan: cmdScan,
   breaches: cmdBreaches,
   archive: cmdArchive,

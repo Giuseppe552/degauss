@@ -1,5 +1,6 @@
 # degauss
 
+[![CI](https://github.com/Giuseppe552/degauss/actions/workflows/ci.yml/badge.svg)](https://github.com/Giuseppe552/degauss/actions/workflows/ci.yml)
 [![Tests: 253](https://img.shields.io/badge/tests-253_passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -18,9 +19,43 @@ git clone https://github.com/Giuseppe552/degauss.git && cd degauss
 npm install && npm run build
 ```
 
+### One command does everything
+
+```sh
+# scan brokers → score exposure → analyse attacks → map supply chain → build removal plan
+degauss me --name "Jane Doe" --city Portland --state OR --email jane@mail.com
+```
+
+Output:
+```
+[1/5] Scanning data brokers...
+  Found on 3 of 6 brokers (11 QIs extracted)
+
+[2/5] Computing exposure score...
+  Exposure: 42.3 bits (threshold: 28.3)
+  Anonymity set: 1
+  YOU ARE UNIQUELY IDENTIFIABLE
+
+[3/5] Analysing attack surface...
+  Feasible attacks: 7 (3 critical)
+    CRITICAL Bank account phone takeover (95% feasible)
+    CRITICAL SIM swap attack (92% feasible)
+    HIGH     Spear phishing via employer context (85% feasible)
+
+[4/5] Mapping data supply chain...
+  2 upstream removal(s) would cascade to 3 sources
+    Acxiom → cascades to spokeo, beenverified
+
+[5/5] Building removal plan...
+  1. Remove from spokeo (uk_dpa) — -12.3 bits
+  2. Remove from whitepages (uk_dpa) — -8.7 bits
+```
+
+### Or step by step
+
 ```sh
 # compute your exposure score
-node apps/cli/dist/index.js score --profile profile.json --country UK
+degauss score --profile profile.json --country UK
 
 # optimal removal plan (what to remove first)
 node apps/cli/dist/index.js plan --profile profile.json
