@@ -9,7 +9,7 @@
  * 16 commands total — see `degauss --help`
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { createAnonFetch, checkTor, printOpsecStatus } from './proxy.js';
@@ -68,8 +68,6 @@ function saveState(state: DaemonState): void {
   mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 });
   const tmp = STATE_FILE + '.tmp';
   writeFileSync(tmp, JSON.stringify(state, null, 2), { mode: 0o600 });
-  // atomic rename
-  const { renameSync } = require('node:fs');
   renameSync(tmp, STATE_FILE);
 }
 
@@ -775,7 +773,15 @@ async function cmdMe(flags: Record<string, string>): Promise<void> {
 
   // ── step 2: score exposure ──
   console.error(`${B}[2/5] Computing exposure score...${R}`);
-  const report = generateReport(records.length > 0 ? records : parseProfile(readJsonFile(flags.profile ?? 'examples/sample-profile.json')), country);
+  if (records.length === 0 && !flags.profile) {
+    console.error(`\n  ${YEL}No records found via scan.${R}`);
+    console.error(`  ${D}This usually means: broker HTML patterns need updating, or JS-rendered sites were skipped.${R}`);
+    console.error(`  ${D}Try: degauss scan --name "${name}" --clearnet --browser${R}`);
+    console.error(`  ${D}Or create a profile manually: degauss score --profile profile.json${R}\n`);
+    console.log(JSON.stringify({ records: [], note: 'no broker records found via scan' }));
+    return;
+  }
+  const report = generateReport(records.length > 0 ? records : parseProfile(readJsonFile(flags.profile!)), country);
 
   const expColor = report.uniquelyIdentifiable ? RED : GRN;
   console.error(`  Exposure: ${B}${report.totalBits.toFixed(1)} bits${R} (threshold: ${report.uniquenessThreshold.toFixed(1)})`);
