@@ -138,6 +138,12 @@ export {
 } from './discovery/username.js';
 
 export {
+  verifyAccount,
+  verifyAllAccounts,
+  buildRemediationPlan,
+} from './discovery/verify.js';
+
+export {
   searchGitHubCode,
   codeSearchReport,
 } from './discovery/codesearch.js';

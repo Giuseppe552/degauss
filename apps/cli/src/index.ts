@@ -39,6 +39,8 @@ import {
   predictAllBrokers, expectedExposure,
   // username enumeration
   enumerateUsername,
+  // verification + remediation
+  verifyAllAccounts, buildRemediationPlan,
   // code search
   codeSearchReport,
   // verification
@@ -1045,32 +1047,69 @@ async function cmdDiscover(flags: Record<string, string>): Promise<void> {
 
   let totalFindings = 0;
 
-  // ── username enumeration ──
+  // ── username enumeration + verification ──
   if (username) {
-    e(`${B}[1] Username enumeration: ${CYN}${username}${R}`);
-    e(`${D}    Checking ${username} across 35+ platforms...${R}\n`);
+    e(`${B}[1] Finding accounts: ${CYN}${username}${R}`);
+    e(`${D}    Checking 35+ platforms...${R}\n`);
 
     const report = await enumerateUsername(username);
     const found = report.results.filter(r => r.exists);
-    totalFindings += found.length;
 
-    if (found.length > 0) {
-      for (const r of found) {
-        e(`    ${RED}FOUND${R}  ${B}${r.platform}${R} ${D}(${r.category})${R}`);
-        e(`           ${D}${r.url}${R}`);
-        e(`           ${D}Visible: ${r.visibleFields.join(', ')}${R}\n`);
-      }
-    } else {
+    if (found.length === 0) {
       e(`    ${GRN}No accounts found for "${username}"${R}\n`);
-    }
+    } else {
+      e(`    ${D}${found.length} potential accounts found. Verifying...${R}\n`);
 
-    e(`    ${D}${report.platformsChecked} platforms checked, ${found.length} accounts found${R}`);
-    const cats = Object.entries(report.categoryCounts);
-    if (cats.length > 0) {
-      e(`    ${D}Categories: ${cats.map(([c, n]) => `${c}: ${n}`).join(', ')}${R}`);
-    }
-    if (report.exposedFields.length > 0) {
-      e(`    ${YEL}Exposed across platforms: ${report.exposedFields.join(', ')}${R}`);
+      // verify each account — check if it's really yours or a false positive
+      const targetName = name ?? username;
+      const verified = await verifyAllAccounts(found, targetName);
+      const plan = buildRemediationPlan(verified);
+
+      totalFindings += verified.filter(v => v.status !== 'false_positive').length;
+
+      // show confirmed accounts with actions
+      if (plan.toDelete.length > 0) {
+        e(`  ${RED}DELETE these accounts:${R}`);
+        for (const v of plan.toDelete) {
+          e(`    ${RED}●${R} ${B}${v.platform}${R} ${D}(${v.category})${R} — ${D}${v.url}${R}`);
+          if (v.action.type === 'delete') {
+            e(`      ${GRN}→ ${v.action.url}${R}`);
+            e(`      ${D}${v.action.instructions}${R}\n`);
+          }
+        }
+      }
+
+      if (plan.toPrivatise.length > 0) {
+        e(`  ${YEL}PRIVATISE these accounts:${R}`);
+        for (const v of plan.toPrivatise) {
+          e(`    ${YEL}●${R} ${B}${v.platform}${R} ${D}(${v.category})${R} — ${D}${v.url}${R}`);
+          if (v.action.type === 'privatise') {
+            e(`      ${GRN}→ ${v.action.url}${R}`);
+            e(`      ${D}${v.action.instructions}${R}\n`);
+          }
+        }
+      }
+
+      if (plan.toInvestigate.length > 0) {
+        e(`  ${CYN}INVESTIGATE (might not be yours):${R}`);
+        for (const v of plan.toInvestigate) {
+          e(`    ${CYN}?${R} ${B}${v.platform}${R} — ${D}${v.url}${R}`);
+          if (v.action.type === 'investigate') {
+            e(`      ${D}${v.action.reason}${R}\n`);
+          }
+        }
+      }
+
+      if (plan.falsePositives.length > 0) {
+        e(`  ${D}FALSE POSITIVES (${plan.falsePositives.length} filtered out): ${plan.falsePositives.map(f => f.platform).join(', ')}${R}\n`);
+      }
+
+      e(`  ${D}Estimated time to clean up: ${B}${plan.estimatedTimeMinutes} minutes${R}`);
+      e(`  ${D}${report.platformsChecked} platforms checked → ${found.length} found → ${verified.filter(v => v.status !== 'false_positive').length} confirmed${R}`);
+
+      if (report.exposedFields.length > 0) {
+        e(`  ${YEL}Data exposed across platforms: ${report.exposedFields.join(', ')}${R}`);
+      }
     }
     e();
   }
