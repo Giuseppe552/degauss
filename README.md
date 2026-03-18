@@ -1,6 +1,6 @@
 # degauss
 
-[![Tests: 189](https://img.shields.io/badge/tests-189_passing-brightgreen)]()
+[![Tests: 253](https://img.shields.io/badge/tests-253_passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Identity attack surface reduction through information theory. Measures how identifiable you are, computes the mathematically optimal removal strategy, generates legal requests, and predicts when removed data will reappear.
@@ -156,7 +156,7 @@ Offensive privacy. Generate unique URLs and email addresses, embed them in your 
 
 ```sh
 npm install && npm run build
-cd packages/core && npm test   # 189 tests
+cd packages/core && npm test   # 253 tests
 ```
 
 ## Origin

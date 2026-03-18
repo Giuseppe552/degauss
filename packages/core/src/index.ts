@@ -96,6 +96,41 @@ export {
   canaryStats,
 } from './discovery/canary.js';
 
+export {
+  positionWeight,
+  classifyResult,
+  parseGoogleSerp,
+  analyseSerpResults,
+} from './discovery/serp.js';
+
+export {
+  parseCdxResponse,
+  buildCdxUrl,
+  buildGoogleCacheUrl,
+  checkWayback,
+  archiveForensics,
+} from './discovery/archive.js';
+
+// monitor — verification and continuous monitoring
+export {
+  createTracker,
+  computeDeadline,
+  verifyRemoval,
+  shouldVerifyNow,
+  dueForVerification,
+} from './monitor/verification.js';
+
+export {
+  createState,
+  computeDelta,
+  generateAlerts,
+  updateState,
+  exposureTrend,
+} from './monitor/daemon.js';
+
+// legal — escalation
+export { generateEscalation } from './legal/escalation.js';
+
 // strategy — social engineering analysis
 export {
   analyseAttackSurface,
