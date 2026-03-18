@@ -170,3 +170,53 @@ export type {
   SyntheticProfile,
   DilutionConfig,
 } from './dilution/synthetic.js';
+
+export type {
+  DaemonState,
+  ExposureSnapshot,
+  MonitorAlert,
+} from './monitor/daemon.js';
+
+export type {
+  RemovalTracker,
+  VerificationResult,
+} from './monitor/verification.js';
+
+export type {
+  SerpReport,
+  SerpResult,
+  ResultCategory,
+} from './discovery/serp.js';
+
+export type {
+  ArchiveReport,
+  CachedSnapshot,
+} from './discovery/archive.js';
+
+export type {
+  SupplyChainGraph,
+  SupplyNode,
+  UpstreamStrategy,
+} from './discovery/supplychain.js';
+
+export type {
+  AttackScenario,
+} from './strategy/socialeng.js';
+
+export type {
+  BreachCheckResult,
+  PasswordCheckResult,
+} from './discovery/breaches.js';
+
+export type {
+  CanaryToken,
+} from './discovery/canary.js';
+
+export type {
+  EscalationComplaint,
+} from './legal/escalation.js';
+
+export type {
+  ScanResult,
+  ScanConfig,
+} from './discovery/scraper.js';
