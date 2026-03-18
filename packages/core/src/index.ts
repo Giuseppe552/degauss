@@ -132,6 +132,17 @@ export {
 export { generateEscalation } from './legal/escalation.js';
 
 export {
+  checkPlatform,
+  enumerateUsername,
+  getAllPlatforms,
+} from './discovery/username.js';
+
+export {
+  searchGitHubCode,
+  codeSearchReport,
+} from './discovery/codesearch.js';
+
+export {
   predictBrokerCoverage,
   predictAllBrokers,
   expectedExposure,

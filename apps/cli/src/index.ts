@@ -37,6 +37,10 @@ import {
   generateEscalation,
   // coverage prediction
   predictAllBrokers, expectedExposure,
+  // username enumeration
+  enumerateUsername,
+  // code search
+  codeSearchReport,
   // verification
   createTracker, verifyRemoval, dueForVerification,
   // monitoring
@@ -130,6 +134,7 @@ ${D}Get started:${R}
   ${CYN}predict${R}       ${D}predict which brokers have your data (no scanning needed)${R}
 
 ${D}Discovery:${R}
+  ${CYN}discover${R}      ${D}find your accounts, code leaks, and breaches (works now)${R}
   ${CYN}scan${R}          ${D}scan data brokers (Tor required, Cloudflare may block)${R}
   ${CYN}serp${R}          ${D}analyse Google search results for your name${R}
   ${CYN}breaches${R}      ${D}check emails against HIBP breach database${R}
@@ -154,9 +159,9 @@ ${D}Monitoring:${R}
   ${CYN}history${R}       ${D}show exposure trend over time${R}
 
 ${D}Quick start:${R}
-  ${B}degauss init${R}                                          ${D}← interactive (recommended)${R}
-  ${B}degauss predict --name "Jane Doe" --country US${R}        ${D}← no scanning, instant${R}
-  ${B}degauss me --name "Jane Doe" --profile my-exposure.json${R}
+  ${B}degauss discover --username giuseppe552 --email you@mail.com${R}  ${D}← find your footprint${R}
+  ${B}degauss init${R}                                                   ${D}← build exposure profile${R}
+  ${B}degauss predict --name "Jane Doe" --country US${R}                 ${D}← instant prediction${R}
 
 ${D}All commands output JSON to stdout. Pipe into jq, python, anything.${R}
 `);
@@ -1023,6 +1028,127 @@ function cmdPredict(flags: Record<string, string>): void {
   jsonOut({ predictions: predictions.filter(p => p.probability > 0.05), expected: exp });
 }
 
+// ─── discover (real discovery — username + code + breaches) ───────────
+async function cmdDiscover(flags: Record<string, string>): Promise<void> {
+  const username = flags.username;
+  const email = flags.email;
+  const name = flags.name;
+
+  if (!username && !email && !name) {
+    console.error(`${RED}error:${R} at least one of --username, --email, or --name required`);
+    process.exit(1);
+  }
+
+  const e = console.error;
+  e(`\n${B}Discovering your digital footprint${R}`);
+  e(`${D}═══════════════════════════════════════════════════${R}\n`);
+
+  let totalFindings = 0;
+
+  // ── username enumeration ──
+  if (username) {
+    e(`${B}[1] Username enumeration: ${CYN}${username}${R}`);
+    e(`${D}    Checking ${username} across 35+ platforms...${R}\n`);
+
+    const report = await enumerateUsername(username);
+    const found = report.results.filter(r => r.exists);
+    totalFindings += found.length;
+
+    if (found.length > 0) {
+      for (const r of found) {
+        e(`    ${RED}FOUND${R}  ${B}${r.platform}${R} ${D}(${r.category})${R}`);
+        e(`           ${D}${r.url}${R}`);
+        e(`           ${D}Visible: ${r.visibleFields.join(', ')}${R}\n`);
+      }
+    } else {
+      e(`    ${GRN}No accounts found for "${username}"${R}\n`);
+    }
+
+    e(`    ${D}${report.platformsChecked} platforms checked, ${found.length} accounts found${R}`);
+    const cats = Object.entries(report.categoryCounts);
+    if (cats.length > 0) {
+      e(`    ${D}Categories: ${cats.map(([c, n]) => `${c}: ${n}`).join(', ')}${R}`);
+    }
+    if (report.exposedFields.length > 0) {
+      e(`    ${YEL}Exposed across platforms: ${report.exposedFields.join(', ')}${R}`);
+    }
+    e();
+  }
+
+  // ── code search ──
+  if (email || name) {
+    const queries = [email, name].filter(Boolean) as string[];
+    e(`${B}[2] Public code search${R}`);
+    e(`${D}    Searching GitHub for your PII in public repos...${R}\n`);
+
+    const codeReport = await codeSearchReport(queries);
+    totalFindings += codeReport.totalResults;
+
+    if (codeReport.totalResults > 0) {
+      for (const r of codeReport.results.slice(0, 10)) {
+        e(`    ${RED}LEAK${R}  ${B}${r.repo}${R} / ${r.filePath}`);
+        e(`          ${D}${r.htmlUrl}${R}`);
+        e(`          ${D}Type: ${r.leakType}${R}\n`);
+      }
+      e(`    ${RED}${codeReport.totalResults} files found across ${codeReport.affectedRepos.length} repos${R}`);
+    } else {
+      e(`    ${GRN}No PII found in public code${R}`);
+    }
+    e();
+  }
+
+  // ── breach check ──
+  if (email) {
+    e(`${B}[3] Credential exposure${R}`);
+    e(`${D}    Checking breaches for ${email}...${R}\n`);
+
+    const apiKey = flags['hibp-key'];
+    const breachResult = await checkBreaches(email, apiKey);
+
+    if (breachResult.breached) {
+      totalFindings += breachResult.breachCount;
+      e(`    ${RED}BREACHED${R} — found in ${B}${breachResult.breachCount}${R} data breaches\n`);
+      for (const b of breachResult.breaches.slice(0, 8)) {
+        e(`    ${RED}●${R} ${B}${b.name}${R} (${b.breachDate})`);
+        e(`      ${D}Data exposed: ${b.dataClasses.join(', ')}${R}`);
+      }
+    } else if (apiKey) {
+      e(`    ${GRN}No breaches found for ${email}${R}`);
+    } else {
+      e(`    ${YEL}Breach check requires HIBP API key (free): haveibeenpwned.com/API/Key${R}`);
+      e(`    ${D}Add --hibp-key YOUR_KEY to check${R}`);
+    }
+    e();
+  }
+
+  // ── password check ──
+  if (flags.password) {
+    e(`${B}[4] Password exposure${R}\n`);
+    const pwResult = await checkPassword(flags.password);
+    if (pwResult.pwned) {
+      totalFindings++;
+      e(`    ${RED}PWNED${R} — this password appeared ${B}${pwResult.occurrences.toLocaleString()}${R} times in breach databases`);
+      e(`    ${RED}Change it immediately on every service where you use it.${R}`);
+    } else {
+      e(`    ${GRN}Password not found in any known breach database${R}`);
+    }
+    e();
+  }
+
+  // ── summary ──
+  e(`${D}═══════════════════════════════════════════════════${R}`);
+  const summaryColor = totalFindings > 5 ? RED : totalFindings > 0 ? YEL : GRN;
+  e(`${B}  ${summaryColor}${totalFindings} findings${R}${B} across all sources${R}`);
+  if (totalFindings > 0) {
+    e(`  ${D}Your digital footprint is traceable. Run 'degauss init' for a full exposure report.${R}`);
+  } else {
+    e(`  ${GRN}Minimal digital footprint detected.${R}`);
+  }
+  e();
+
+  jsonOut({ username: username ?? null, findings: totalFindings });
+}
+
 // ─── main ─────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 
@@ -1038,6 +1164,7 @@ wantJson = flags.json === 'true';
 const asyncCommands: Record<string, (f: Record<string, string>) => Promise<void>> = {
   me: cmdMe,
   init: cmdInit,
+  discover: cmdDiscover,
   scan: cmdScan,
   breaches: cmdBreaches,
   archive: cmdArchive,
