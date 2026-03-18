@@ -45,14 +45,28 @@ export async function runWizard(): Promise<{
   rl.close();
 
   // parse location
-  const locParts = location.split(',').map(s => s.trim());
-  const city = locParts[0] || undefined;
-  const countryRaw = locParts[locParts.length - 1] || '';
-  const country = ['uk', 'gb', 'united kingdom', 'england', 'scotland', 'wales']
-    .includes(countryRaw.toLowerCase()) ? 'UK'
-    : ['us', 'usa', 'united states'].includes(countryRaw.toLowerCase()) ? 'US'
-    : countryRaw.toUpperCase() || 'US';
-  const state = locParts.length === 3 ? locParts[1] : undefined;
+  // parse location — handles: "Manchester, UK", "UK", "Portland, OR, US", ""
+  const locParts = location.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  const countryAliases: Record<string, string> = {
+    uk: 'UK', gb: 'UK', 'united kingdom': 'UK', england: 'UK', scotland: 'UK', wales: 'UK',
+    us: 'US', usa: 'US', 'united states': 'US',
+    ca: 'CA', canada: 'CA', au: 'AU', australia: 'AU',
+  };
+
+  let city: string | undefined;
+  let state: string | undefined;
+  let country = 'US'; // default
+
+  for (let i = locParts.length - 1; i >= 0; i--) {
+    const match = countryAliases[locParts[i].toLowerCase()];
+    if (match) {
+      country = match;
+      locParts.splice(i, 1); // remove the country from parts
+      break;
+    }
+  }
+  if (locParts.length >= 1) city = locParts[0];
+  if (locParts.length >= 2) state = locParts[1];
 
   // parse extra fields
   const extraFields: Array<{ field: QIField; value: string }> = [];

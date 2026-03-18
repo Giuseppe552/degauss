@@ -159,10 +159,14 @@ export async function verifyAccount(
       }
     }
 
-    // check if the target name appears on the page
+    // check if the target name appears anywhere — body, title, meta tags, og tags
+    // also check the username itself in the title (GitHub: "Giuseppe552 (Giuseppe Giona)")
     const foundFirst = firstName.length > 2 && lowerHtml.includes(firstName);
     const foundLast = lastName.length > 2 && lowerHtml.includes(lastName);
     const foundFull = foundFirst && foundLast;
+    // check if the URL's username appears in the title — strong signal even without name
+    const urlUsername = result.url.split('/').pop()?.toLowerCase() ?? '';
+    const usernameInTitle = urlUsername.length > 2 && extractTitle(html).toLowerCase().includes(urlUsername);
 
     // extract page title
     const pageTitle = extractTitle(html);
@@ -188,6 +192,17 @@ export async function verifyAccount(
         action = { type: 'investigate', reason: 'Partial name match. Check if this is your account.' };
       }
       return makeResult(result, 'likely', 0.6, foundFirst || foundLast, false, pageTitle, action);
+    }
+
+    // username found in page title — the page is FOR this username, even if
+    // the real name isn't visible (e.g., GitHub "Giuseppe552" without display name set)
+    if (usernameInTitle && html.length > 1000) {
+      if (platformActions) {
+        action = { type: 'privatise', url: platformActions.privacyUrl, instructions: platformActions.privacyInstructions };
+      } else {
+        action = { type: 'investigate', reason: 'Account exists with your username. Check if this is yours.' };
+      }
+      return makeResult(result, 'likely', 0.55, false, false, pageTitle, action);
     }
 
     // page exists but name not found — could be someone else's account

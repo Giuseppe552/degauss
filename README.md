@@ -1,22 +1,60 @@
 # degauss
 
 [![CI](https://github.com/Giuseppe552/degauss/actions/workflows/ci.yml/badge.svg)](https://github.com/Giuseppe552/degauss/actions/workflows/ci.yml)
-[![Tests: 253](https://img.shields.io/badge/tests-253_passing-brightgreen)]()
+[![Tests: 303](https://img.shields.io/badge/tests-303_passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Identity attack surface reduction through information theory. Measures how identifiable you are, computes the mathematically optimal removal strategy, generates legal requests, and predicts when removed data will reappear.
+Find your digital footprint, measure your exposure in bits, and systematically reduce it. Scans 35+ platforms for your accounts, verifies which are really yours, filters false positives, and gives you direct links to delete or privatise each one. Generates legal removal requests under GDPR/CCPA/UK DPA. Maps the data broker supply chain to find where your data originates.
 
 ## What it does
 
-Most removal tools play whack-a-mole: remove a record, it reappears in 60 days. degauss asks a different question: **how many bits of information identify you, and what's the most efficient way to reduce that?**
+```sh
+$ degauss discover --username giuseppe552 --name "Giuseppe Giona" --email g@test.com
 
-Sweeney (2000) showed that {ZIP, date of birth, sex} uniquely identifies 87% of Americans. That's ~31.6 bits against a 28.3-bit population. degauss computes your actual bit exposure across data brokers, models your identity as a graph, and finds the minimum cut.
+Discovering your digital footprint
+═══════════════════════════════════════════════════
+
+[1] Finding accounts: giuseppe552
+    8 potential accounts found. Verifying...
+
+  DELETE these accounts:
+    ● Reddit (forum) — https://www.reddit.com/user/giuseppe552
+      → https://www.reddit.com/settings/account
+      Settings → Account → Delete account
+
+  PRIVATISE these accounts:
+    ● Steam (gaming) — https://steamcommunity.com/id/giuseppe552
+      → https://steamcommunity.com/my/edit/settings
+      Edit Profile → Privacy Settings → set everything to Private
+
+  FALSE POSITIVES (5 filtered out): Instagram, TikTok, Pinterest, YouTube, PyPI
+
+  Estimated time to clean up: 9 minutes
+  34 platforms checked → 8 found → 3 confirmed
+```
+
+Not predictions. Not models. Real accounts, verified, with direct action links.
+
+Sweeney (2000) showed {ZIP, DOB, sex} uniquely identifies 87% of Americans — ~31.6 bits against a 28.3-bit population. degauss measures your actual exposure in bits and computes the optimal reduction strategy.
 
 ## Run it
 
 ```sh
 git clone https://github.com/Giuseppe552/degauss.git && cd degauss
 npm install && npm run build
+```
+
+### Find your footprint (works now, no setup)
+
+```sh
+# discover accounts, code leaks, and breaches
+degauss discover --username your-handle --name "Your Name" --email you@mail.com
+
+# predict which data brokers have your data (instant, no network)
+degauss predict --name "Your Name" --country US
+
+# interactive profile builder (4 questions)
+degauss init
 ```
 
 ### One command does everything
@@ -155,7 +193,7 @@ packages/core/
   monitor/        re-emergence prediction, monitoring schedules
   dilution/       synthetic profile generation, k-anonymity computation
 
-apps/cli/         7 commands, coloured output, JSON piping
+apps/cli/         20 commands, Tor SOCKS5h routing, state persistence
 ```
 
 ### Data broker supply chain
@@ -196,7 +234,7 @@ Offensive privacy. Generate unique URLs and email addresses, embed them in your 
 
 ```sh
 npm install && npm run build
-cd packages/core && npm test   # 253 tests
+cd packages/core && npm test   # 303 tests
 ```
 
 ## Origin
