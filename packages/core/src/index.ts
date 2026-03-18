@@ -131,6 +131,13 @@ export {
 // legal — escalation
 export { generateEscalation } from './legal/escalation.js';
 
+export {
+  predictBrokerCoverage,
+  predictAllBrokers,
+  expectedExposure,
+  getAllBrokers,
+} from './discovery/coverage.js';
+
 // strategy — social engineering analysis
 export {
   analyseAttackSurface,

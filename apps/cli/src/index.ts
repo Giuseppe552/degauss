@@ -13,6 +13,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync, renameSy
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { createAnonFetch, checkTor, printOpsecStatus } from './proxy.js';
+import { runWizard } from './wizard.js';
 import {
   // scoring
   generateReport,
@@ -34,6 +35,8 @@ import {
   generateRequest, generateDmcaRequest,
   // escalation
   generateEscalation,
+  // coverage prediction
+  predictAllBrokers, expectedExposure,
   // verification
   createTracker, verifyRemoval, dueForVerification,
   // monitoring
@@ -112,8 +115,10 @@ function usage(): void {
   console.log(`
 ${B}degauss${R} — identity attack surface reduction
 
-${D}Full pipeline:${R}
-  ${CYN}me${R}            ${D}scan + score + attacks + supply chain + plan (one command)${R}
+${D}Get started:${R}
+  ${CYN}init${R}          ${D}interactive profile builder (asks questions, no JSON needed)${R}
+  ${CYN}me${R}            ${D}full pipeline: scan + score + attacks + plan (one command)${R}
+  ${CYN}predict${R}       ${D}predict which brokers have your data (no scanning needed)${R}
 
 ${D}Discovery:${R}
   ${CYN}scan${R}          ${D}scan data brokers (Tor required, Cloudflare may block)${R}
@@ -139,15 +144,10 @@ ${D}Monitoring:${R}
   ${CYN}watch${R}         ${D}continuous monitoring (single scan + delta)${R}
   ${CYN}history${R}       ${D}show exposure trend over time${R}
 
-${D}Quick start — one command does everything:${R}
-  ${B}degauss me --name "Jane Doe" --city Portland --state OR --email jane@mail.com${R}
-
-${D}Or step by step:${R}
-  degauss scan --name "Jane Doe" --city Portland --state OR
-  degauss attacks
-  degauss plan
-  degauss request --source spokeo --fields full_name,email --name "Jane Doe" --email jane@mail.com
-  degauss watch
+${D}Quick start:${R}
+  ${B}degauss init${R}                                          ${D}← interactive (recommended)${R}
+  ${B}degauss predict --name "Jane Doe" --country US${R}        ${D}← no scanning, instant${R}
+  ${B}degauss me --name "Jane Doe" --profile my-exposure.json${R}
 
 ${D}All commands output JSON to stdout. Pipe into jq, python, anything.${R}
 `);
@@ -880,6 +880,89 @@ async function cmdMe(flags: Record<string, string>): Promise<void> {
   console.log(JSON.stringify({ report, attacks: summary, supplyChain: leafBrokers.length > 0 ? computeUpstreamStrategy(leafBrokers) : null }, null, 2));
 }
 
+// ─── init (interactive wizard) ─────────────────────────────────────────
+async function cmdInit(flags: Record<string, string>): Promise<void> {
+  const result = await runWizard();
+  const outPath = flags.output ?? 'my-exposure.json';
+
+  // save profile
+  writeFileSync(outPath, JSON.stringify({ records: result.records }, null, 2));
+  console.error(`\n${B}Profile saved to ${outPath}${R}`);
+
+  // save state
+  const state = loadState() ?? createState({
+    name: result.name, city: result.city, state: result.state, country: result.country,
+  });
+  const report = generateReport(result.records, result.country);
+  const snapshot: ExposureSnapshot = {
+    date: new Date().toISOString(),
+    totalBits: report.totalBits,
+    anonymitySet: report.anonymitySet,
+    recordCount: result.records.length,
+    activeSources: result.records.map(r => r.source),
+  };
+  saveState(updateState(state, result.records, snapshot));
+
+  // show immediate results
+  const color = report.uniquelyIdentifiable ? RED : GRN;
+  console.error(`\n${B}Exposure Summary${R}`);
+  console.error(`  Total: ${B}${report.totalBits.toFixed(1)} bits${R} | Anonymity set: ${color}${report.anonymitySet}${R}`);
+  console.error(`  ${color}${report.uniquelyIdentifiable ? 'UNIQUELY IDENTIFIABLE' : 'Not uniquely identifiable'}${R}`);
+
+  // predict broker coverage
+  const fields = [...new Set(result.records.flatMap(r => r.qis.map(q => q.field)))];
+  const exp = expectedExposure(result.name, result.country, fields);
+  console.error(`\n${B}Predicted Broker Coverage${R}`);
+  console.error(`  Expected on ${YEL}${exp.expectedBrokers.toFixed(1)}${R} brokers | Expected exposure: ${YEL}${exp.expectedBits.toFixed(1)} bits${R}`);
+  for (const b of exp.topBrokers.slice(0, 5)) {
+    console.error(`    ${CYN}${b.name}${R} — ${(b.probability * 100).toFixed(0)}% likely — opt out: ${D}${b.optOutUrl}${R}`);
+  }
+
+  // show attack surface
+  const scenarios = analyseAttackSurface(fields);
+  const summary = attackSummary(scenarios);
+  if (summary.fullyFeasible > 0) {
+    console.error(`\n${B}Attack Surface${R}: ${RED}${summary.fullyFeasible} feasible attacks${R} (${summary.criticalFeasible} critical)`);
+    for (const t of summary.topThreats) {
+      console.error(`    ${RED}${t.impact.toUpperCase()}${R} ${t.name}`);
+    }
+  }
+
+  console.error(`\n${D}Next steps:`);
+  console.error(`  degauss plan                    — optimal removal order`);
+  console.error(`  degauss request --source spokeo --fields full_name,email --name "${result.name}" --email "${result.email ?? 'you@mail.com'}"${R}`);
+  console.error(`  degauss attacks                 — full attack surface analysis`);
+  console.error(`  degauss supply-chain --sources ${result.records.map(r => r.source).join(',')}${R}\n`);
+
+  console.log(JSON.stringify(report, null, 2));
+}
+
+// ─── predict (statistical coverage without scanning) ──────────────────
+function cmdPredict(flags: Record<string, string>): void {
+  const name = requireFlag(flags, 'name');
+  const country = flags.country ?? 'US';
+
+  const predictions = predictAllBrokers(name, country);
+  const exp = expectedExposure(name, country);
+
+  console.error(`\n${B}Predicted Broker Coverage: ${name}${R}`);
+  console.error(`${D}─────────────────────────────────${R}`);
+  console.error(`  Expected on ${YEL}${exp.expectedBrokers.toFixed(1)}${R} of ${predictions.length} known brokers`);
+  console.error(`  Expected exposure: ${YEL}${exp.expectedBits.toFixed(1)} bits${R}\n`);
+
+  for (const p of predictions) {
+    if (p.probability < 0.05) continue;
+    const bar = '\u2588'.repeat(Math.round(p.probability * 10));
+    const color = p.probability > 0.6 ? RED : p.probability > 0.3 ? YEL : D;
+    console.error(`  ${color}${(p.probability * 100).toFixed(0).padStart(3)}%${R} ${bar.padEnd(10)} ${B}${p.broker.name}${R}`);
+    console.error(`       ${D}Fields: ${p.likelyFields.join(', ')}${R}`);
+    console.error(`       ${D}Opt out: ${p.optOutUrl}${R}`);
+    console.error(`       ${D}Method: ${p.optOutMethod}${R}\n`);
+  }
+
+  console.log(JSON.stringify({ predictions: predictions.filter(p => p.probability > 0.05), expected: exp }, null, 2));
+}
+
 // ─── main ─────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 
@@ -893,6 +976,7 @@ const { command, flags } = parseArgs(args);
 // async commands need top-level await wrapper
 const asyncCommands: Record<string, (f: Record<string, string>) => Promise<void>> = {
   me: cmdMe,
+  init: cmdInit,
   scan: cmdScan,
   breaches: cmdBreaches,
   archive: cmdArchive,
@@ -901,6 +985,7 @@ const asyncCommands: Record<string, (f: Record<string, string>) => Promise<void>
 };
 
 const syncCommands: Record<string, (f: Record<string, string>) => void> = {
+  predict: cmdPredict,
   score: cmdScore,
   plan: cmdPlan,
   attacks: cmdAttacks,
