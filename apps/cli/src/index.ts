@@ -896,7 +896,6 @@ async function cmdInit(flags: Record<string, string>): Promise<void> {
 
   // save profile
   writeFileSync(outPath, JSON.stringify({ records: result.records }, null, 2));
-  console.error(`\n${B}Profile saved to ${outPath}${R}`);
 
   // save state
   const state = loadState() ?? createState({
@@ -912,36 +911,88 @@ async function cmdInit(flags: Record<string, string>): Promise<void> {
   };
   saveState(updateState(state, result.records, snapshot));
 
-  // show immediate results
-  const color = report.uniquelyIdentifiable ? RED : GRN;
-  console.error(`\n${B}Exposure Summary${R}`);
-  console.error(`  Total: ${B}${report.totalBits.toFixed(1)} bits${R} | Anonymity set: ${color}${report.anonymitySet}${R}`);
-  console.error(`  ${color}${report.uniquelyIdentifiable ? 'UNIQUELY IDENTIFIABLE' : 'Not uniquely identifiable'}${R}`);
-
-  // predict broker coverage
   const fields = [...new Set(result.records.flatMap(r => r.qis.map(q => q.field)))];
-  const exp = expectedExposure(result.name, result.country, fields);
-  console.error(`\n${B}Predicted Broker Coverage${R}`);
-  console.error(`  Expected on ${YEL}${exp.expectedBrokers.toFixed(1)}${R} brokers | Expected exposure: ${YEL}${exp.expectedBits.toFixed(1)} bits${R}`);
-  for (const b of exp.topBrokers.slice(0, 5)) {
-    console.error(`    ${CYN}${b.name}${R} — ${(b.probability * 100).toFixed(0)}% likely — opt out: ${D}${b.optOutUrl}${R}`);
-  }
-
-  // show attack surface
   const scenarios = analyseAttackSurface(fields);
   const summary = attackSummary(scenarios);
+  const exp = expectedExposure(result.name, result.country, fields);
+
+  // ─── THE REPORT ───────────────────────────────────────────────────
+  const e = console.error;
+  const color = report.uniquelyIdentifiable ? RED : GRN;
+  const line = '═══════════════════════════════════════════════════════';
+
+  e(`\n${color}${line}${R}`);
+  e(`${B}  EXPOSURE REPORT: ${result.name}${R}`);
+  e(`${color}${line}${R}\n`);
+
+  // ── HEADLINE ──
+  e(`  ${B}${report.totalBits.toFixed(0)}${R} bits of identifying information exposed`);
+  e(`  ${B}${report.anonymitySet === 1 ? `${RED}You are uniquely identifiable` : `${GRN}Anonymity set: ${report.anonymitySet} people`}${R}`);
+  e(`  ${B}${summary.fullyFeasible}${R} social engineering attacks are feasible right now`);
+  e(`  Your data is likely on ${B}${exp.expectedBrokers.toFixed(0)}${R} broker sites\n`);
+
+  // ── WHAT AN ATTACKER CAN DO ──
   if (summary.fullyFeasible > 0) {
-    console.error(`\n${B}Attack Surface${R}: ${RED}${summary.fullyFeasible} feasible attacks${R} (${summary.criticalFeasible} critical)`);
-    for (const t of summary.topThreats) {
-      console.error(`    ${RED}${t.impact.toUpperCase()}${R} ${t.name}`);
+    e(`${RED}  IMMEDIATE THREATS${R}`);
+    e(`${D}  ─────────────────────────────────${R}`);
+    for (const s of scenarios.filter(s => s.feasibility >= 0.7).slice(0, 5)) {
+      const ic = s.impact === 'critical' ? RED : YEL;
+      e(`  ${ic}${s.impact.toUpperCase().padEnd(8)}${R}  ${B}${s.name}${R}`);
+      e(`  ${D}          ${s.description.slice(0, 90)}${R}`);
+      e(`  ${GRN}          Fix: ${s.mitigation.slice(0, 90)}${R}\n`);
     }
   }
 
-  console.error(`\n${D}Next steps:`);
-  console.error(`  degauss plan                    — optimal removal order`);
-  console.error(`  degauss request --source spokeo --fields full_name,email --name "${result.name}" --email "${result.email ?? 'you@mail.com'}"${R}`);
-  console.error(`  degauss attacks                 — full attack surface analysis`);
-  console.error(`  degauss supply-chain --sources ${result.records.map(r => r.source).join(',')}${R}\n`);
+  // ── WHERE TO REMOVE FIRST ──
+  e(`${CYN}  REMOVE YOUR DATA (start here)${R}`);
+  e(`${D}  ─────────────────────────────────${R}`);
+  const topBrokers = report.removalPlan.slice(0, 5);
+  for (let i = 0; i < topBrokers.length; i++) {
+    const step = topBrokers[i];
+    // find opt-out URL from coverage data
+    const pred = exp.topBrokers.find(b => b.name.toLowerCase().replace(/\s/g, '') === step.source);
+    e(`  ${B}${i + 1}.${R} ${CYN}${step.source}${R}`);
+    e(`     ${D}Fields exposed: ${step.fields.join(', ')}${R}`);
+    if (pred) e(`     ${D}Opt out: ${pred.optOutUrl}${R}`);
+    e(`     ${GRN}Removing saves ${step.bitsReduced > 0 ? step.bitsReduced + ' bits' : 'reduces linkability'}${R}\n`);
+  }
+
+  // ── YOUR EXPOSURE BREAKDOWN ──
+  e(`${D}  EXPOSURE BY FIELD${R}`);
+  e(`${D}  ─────────────────────────────────${R}`);
+  for (const attr of report.attributes.slice(0, 8)) {
+    const bar = '\u2588'.repeat(Math.min(Math.round(attr.exposureBits), 25));
+    e(`  ${attr.field.padEnd(15)} ${CYN}${attr.exposureBits.toFixed(1).padStart(5)}${R} bits  ${D}${bar}${R}  ${D}(${attr.sourceCount} sources)${R}`);
+  }
+
+  // ── DATA SUPPLY CHAIN ──
+  const leafBrokers = result.records.map(r => r.source);
+  if (leafBrokers.length > 1) {
+    const strategy = computeUpstreamStrategy(leafBrokers);
+    if (strategy.removalOrder.length > 0) {
+      e(`\n${D}  DATA SUPPLY CHAIN${R}`);
+      e(`${D}  ─────────────────────────────────${R}`);
+      e(`  ${D}${strategy.removalOrder.length} upstream removal(s) cascade to ${strategy.totalCascade} downstream sources${R}`);
+      for (const node of strategy.removalOrder.slice(0, 3)) {
+        const cascade = strategy.cascadeMap.get(node.id) ?? [];
+        e(`  ${CYN}${node.name}${R} ${D}→ cascades to: ${cascade.join(', ')}${R}`);
+      }
+    }
+  }
+
+  // ── NEXT ACTIONS ──
+  e(`\n${B}  WHAT TO DO NOW${R}`);
+  e(`${D}  ─────────────────────────────────${R}`);
+  if (topBrokers.length > 0) {
+    const firstSource = topBrokers[0].source;
+    const firstPred = exp.topBrokers.find(b => b.name.toLowerCase().replace(/\s/g, '') === firstSource);
+    e(`  ${GRN}1.${R} Go to ${firstPred?.optOutUrl ?? firstSource + ' opt-out page'} and request removal`);
+  }
+  e(`  ${GRN}2.${R} Generate legal requests: ${D}degauss request --source <broker> --fields full_name,email --name "${result.name}" --email your@email.com${R}`);
+  e(`  ${GRN}3.${R} Set up monitoring: ${D}degauss watch${R}`);
+  e(`  ${GRN}4.${R} Deep dive: ${D}degauss attacks${R}  |  ${D}degauss plan${R}  |  ${D}degauss supply-chain --sources ${leafBrokers.slice(0, 3).join(',')}${R}`);
+
+  e(`\n${D}  Profile: ${outPath} | State: ${STATE_FILE}${R}\n`);
 
   jsonOut(report);
 }
