@@ -10,7 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@degauss/core": "*"
+    "@degauss/core": "*",
+    "socks-proxy-agent": "^9.0.0",
+    "undici": "^7.24.4"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

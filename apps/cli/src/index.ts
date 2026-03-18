@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { createAnonFetch, checkTor, printOpsecStatus } from './proxy.js';
 import {
   // scoring
   generateReport,
@@ -157,17 +158,31 @@ async function cmdScan(flags: Record<string, string>): Promise<void> {
   const city = flags.city;
   const state = flags.state;
   const country = flags.country ?? 'US';
-  const proxy = flags.proxy;
+  const clearnet = flags.clearnet === 'true';
 
   console.error(`\n${B}Scanning data brokers...${R}`);
   console.error(`${D}  Target: ${name}${city ? `, ${city}` : ''}${state ? `, ${state}` : ''}${R}`);
-  console.error(`${D}  Brokers: ${SCAN_TARGETS.length} targets (JS-rendered sites skipped without --browser)${R}`);
-  if (proxy) console.error(`${D}  Proxy: ${proxy}${R}`);
+  console.error(`${D}  Brokers: ${SCAN_TARGETS.length} targets${R}`);
+
+  // OPSEC: enforce Tor unless --clearnet explicitly set
+  console.error(`\n${D}OPSEC check:${R}`);
+  const torStatus = await checkTor();
+  printOpsecStatus(torStatus, clearnet);
+
+  if (!torStatus.available && !clearnet) {
+    process.exit(1);
+  }
+
+  const fetchFn = createAnonFetch({
+    tor: torStatus.available && !clearnet,
+    proxyUrl: flags.proxy,
+  });
   console.error();
 
   const results = await scanAll({
-    name, city, state, proxy,
+    name, city, state,
     skipJS: flags.browser !== 'true',
+    fetchFn,
   });
 
   for (const r of results) {
@@ -538,13 +553,16 @@ async function cmdVerify(flags: Record<string, string>): Promise<void> {
   for (const tracker of due) {
     console.error(`  ${CYN}${tracker.source}${R} (requested ${tracker.requestedAt.slice(0, 10)}, deadline ${tracker.deadlineAt.slice(0, 10)})`);
 
-    // re-scan the broker
+    // re-scan the broker through Tor
+    const torSt = await checkTor();
+    const vFetch = createAnonFetch({ tor: torSt.available });
     const results = await scanAll({
       name: state.profile.name,
       city: state.profile.city,
       state: state.profile.state,
       targets: [tracker.source],
       skipJS: true,
+      fetchFn: vFetch,
     });
 
     const records = resultsToRecords(results);
@@ -581,14 +599,23 @@ async function cmdWatch(flags: Record<string, string>): Promise<void> {
     state = createState({ name: name!, city: flags.city, state: flags.state, country });
   }
 
+  const clearnet = flags.clearnet === 'true';
   console.error(`\n${B}Monitoring scan: ${state.profile.name}${R}`);
   console.error(`${D}─────────────────────────────────${R}`);
+
+  const torStatus = await checkTor();
+  if (!torStatus.available && !clearnet) {
+    printOpsecStatus(torStatus, false);
+    process.exit(1);
+  }
+  const fetchFn = createAnonFetch({ tor: torStatus.available && !clearnet });
 
   const results = await scanAll({
     name: state.profile.name,
     city: state.profile.city,
     state: state.profile.state,
     skipJS: true,
+    fetchFn,
   });
 
   const records = resultsToRecords(results);
@@ -724,14 +751,24 @@ async function cmdMe(flags: Record<string, string>): Promise<void> {
   const st = flags.state;
   const country = flags.country ?? 'US';
 
+  const clearnet = flags.clearnet === 'true';
+
   console.error(`\n${B}degauss: full exposure analysis${R}`);
   console.error(`${D}═══════════════════════════════════════════════════${R}`);
   console.error(`  Target: ${name}${city ? `, ${city}` : ''}${st ? `, ${st}` : ''}`);
   console.error(`  Country: ${country}\n`);
 
+  // OPSEC: enforce Tor
+  console.error(`${D}OPSEC check:${R}`);
+  const torStatus = await checkTor();
+  printOpsecStatus(torStatus, clearnet);
+  if (!torStatus.available && !clearnet) { process.exit(1); }
+  const fetchFn = createAnonFetch({ tor: torStatus.available && !clearnet, proxyUrl: flags.proxy });
+  console.error();
+
   // ── step 1: scan brokers ──
   console.error(`${B}[1/5] Scanning data brokers...${R}`);
-  const scanResults = await scanAll({ name, city, state: st, skipJS: true });
+  const scanResults = await scanAll({ name, city, state: st, skipJS: true, fetchFn });
   const records = resultsToRecords(scanResults);
   const foundCount = scanResults.filter(r => r.found).length;
   console.error(`  Found on ${RED}${foundCount}${R} of ${scanResults.length} brokers (${records.reduce((s, r) => s + r.qis.length, 0)} QIs extracted)\n`);
