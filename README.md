@@ -1,0 +1,143 @@
+# degauss
+
+[![Tests: 119](https://img.shields.io/badge/tests-119_passing-brightgreen)]()
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Identity attack surface reduction through information theory. Measures how identifiable you are, computes the mathematically optimal removal strategy, generates legal requests, and predicts when removed data will reappear.
+
+## What it does
+
+Most removal tools play whack-a-mole: remove a record, it reappears in 60 days. degauss asks a different question: **how many bits of information identify you, and what's the most efficient way to reduce that?**
+
+Sweeney (2000) showed that {ZIP, date of birth, sex} uniquely identifies 87% of Americans. That's ~31.6 bits against a 28.3-bit population. degauss computes your actual bit exposure across data brokers, models your identity as a graph, and finds the minimum cut.
+
+## Run it
+
+```sh
+git clone https://github.com/Giuseppe552/degauss.git && cd degauss
+npm install && npm run build
+```
+
+```sh
+# compute your exposure score
+node apps/cli/dist/index.js score --profile profile.json --country UK
+
+# optimal removal plan (what to remove first)
+node apps/cli/dist/index.js plan --profile profile.json
+
+# generate a UK GDPR Article 17 erasure request
+node apps/cli/dist/index.js request --source spokeo --fields full_name,email,phone \
+  --country UK --name "Your Name" --email "you@example.com"
+
+# DMCA takedown for your photos
+node apps/cli/dist/index.js dmca --source spokeo --photo-url https://... \
+  --name "Your Name" --email "you@example.com"
+
+# predict re-emergence after removal
+node apps/cli/dist/index.js monitor --sources spokeo,whitepages,radaris
+
+# check if two records refer to the same person (Fellegi-Sunter)
+node apps/cli/dist/index.js linkage --record-a a.json --record-b b.json
+
+# generate synthetic profiles for data dilution
+node apps/cli/dist/index.js dilute --profile profile.json --count 20 --anchor full_name
+```
+
+Every command outputs JSON to stdout. Pipe into `jq`, Python, anything.
+
+## The maths
+
+| Concept | Method | Reference |
+|---------|--------|-----------|
+| Exposure quantification | Shannon entropy, self-information per QI | Shannon (1948), Sweeney (2000) |
+| Uniqueness threshold | log₂(N) bits for population N | Golle (2006) |
+| Anonymity set | 2^H — effective group size from entropy | Díaz et al. (2002, PET) |
+| Identity graph | Records as nodes, linking QIs as edges | Fellegi & Sunter (1969) |
+| Optimal removal | Min vertex cut via max-flow (Ford-Fulkerson) | Menger's theorem |
+| Removal ordering | Submodular greedy, (1-1/e) approximation | Krause & Golovin (2014) |
+| Record linkage | Fellegi-Sunter log-likelihood ratios | Fellegi & Sunter (1969, JASA) |
+| String matching | Jaro-Winkler similarity | Jaro (1989), Winkler (2006) |
+| Re-emergence | Exponential model of broker refresh cycles | Markov process |
+| Data dilution | Synthetic profiles for k-anonymity | Sweeney (2002), Howe & Nissenbaum (2009) |
+| Legal requests | GDPR Art 17, UK DPA, CCPA §1798.105, DMCA §512(c)(3) | — |
+
+<details>
+<summary><strong>How the exposure score works</strong></summary>
+
+Each quasi-identifier (name, email, phone, ZIP, DOB) contributes bits of identifying information. A rare surname contributes more bits than a common one. An email is near-unique (~28 bits). Sex is ~1 bit.
+
+The total exposure accounts for correlations between fields — ZIP and city are highly correlated (ρ=0.85), so they don't double-count. Full name subsumes first/last name.
+
+When your total exceeds log₂(population), you're uniquely identifiable. The anonymity set = 2^(threshold - exposure). An anonymity set of 1 means you're singled out.
+
+</details>
+
+<details>
+<summary><strong>How the removal plan works</strong></summary>
+
+Your identity is modelled as a graph. Nodes = records on different sources. Edges = linking quasi-identifiers (shared email, shared phone+name, etc.), weighted by mutual information.
+
+The adversary's re-identification power = max-flow through this graph. The optimal removal set = minimum vertex cut (max-flow min-cut theorem). Among equally effective removals, we prioritise by difficulty — a self-service opt-out form beats a notarised letter to LexisNexis.
+
+The greedy ordering achieves at least 63% of optimal (submodular guarantee, Krause & Golovin 2014).
+
+</details>
+
+<details>
+<summary><strong>How data dilution works</strong></summary>
+
+When removal fails (public records, government data), dilution increases k-anonymity by adding statistically plausible records sharing the target's anchor fields (usually just name).
+
+If there are 20 "Giuseppe Giona" records with different addresses, phones, and employers, the adversary's confidence drops to 1/20 — adding log₂(20) ≈ 4.3 bits of uncertainty.
+
+Synthetic profiles are internally consistent (city matches ZIP, area code matches region) and varied enough to actually increase entropy.
+
+</details>
+
+## Stack
+
+```
+packages/core/
+  quantify/       entropy, population models, identity graph, exposure reports
+  strategy/       Fellegi-Sunter record linkage, Jaro-Winkler similarity
+  legal/          GDPR, UK DPA, CCPA, DMCA request generation
+  monitor/        re-emergence prediction, monitoring schedules
+  dilution/       synthetic profile generation, k-anonymity computation
+
+apps/cli/         7 commands, coloured output, JSON piping
+```
+
+## Profile format
+
+```json
+{
+  "records": [
+    {
+      "source": "spokeo",
+      "url": "https://spokeo.com/Your-Name",
+      "qis": [
+        { "field": "full_name", "value": "Your Name", "source": "spokeo" },
+        { "field": "email", "value": "you@example.com", "source": "spokeo" },
+        { "field": "phone", "value": "+447700123456", "source": "spokeo" }
+      ],
+      "discoveredAt": 1710700000000,
+      "status": "active"
+    }
+  ]
+}
+```
+
+## Develop
+
+```sh
+npm install && npm run build
+cd packages/core && npm test   # 119 tests
+```
+
+## Origin
+
+Four tools, one mathematical thread: measuring what an adversary can learn — about your documents ([PDF Changer](https://github.com/Giuseppe552/pdf-changer)), your identity ([threadr](https://github.com/Giuseppe552/threadr)), your transactions ([ε-tx](https://github.com/Giuseppe552/epsilon-tx)), and now reducing it.
+
+## License
+
+MIT

@@ -1,0 +1,16 @@
+{
+  "name": "degauss",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Identity attack surface reduction through information theory",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm test --workspaces",
+    "cli": "node apps/cli/dist/index.js"
+  },
+  "license": "MIT"
+}
