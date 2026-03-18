@@ -38,7 +38,7 @@ export async function runWizard(): Promise<{
   const name = await ask(rl, `  ${CYN}Name${R} (as it appears on public records): `);
   if (!name) { console.error(`${RED}  Name required.${R}`); rl.close(); process.exit(1); }
 
-  const location = await ask(rl, `  ${CYN}City, Country${R} (e.g. Manchester, UK): `);
+  const location = await ask(rl, `  ${CYN}City, Country${R} (e.g. Manchester, UK — or just UK): `);
   const email = await ask(rl, `  ${CYN}Email${R} (if publicly findable, or skip): `);
   const extra = await ask(rl, `  ${CYN}Anything else exposed?${R} phone / address / employer (comma-separated, or skip): `);
 
@@ -85,37 +85,39 @@ export async function runWizard(): Promise<{
   for (const pred of likelyBrokers) {
     const qis: Array<{ field: QIField; value: string; source: string }> = [];
 
-    // add the fields this broker typically has
+    // include ALL fields the broker typically has — not just confirmed ones.
+    // the broker PROBABLY has these fields even if the user didn't confirm.
+    // this gives a realistic exposure score instead of "1 field per broker."
     for (const field of pred.likelyFields) {
       let value = '';
       switch (field) {
         case 'full_name': value = name; break;
         case 'first_name': value = nameParts[0] ?? ''; break;
         case 'last_name': value = nameParts[nameParts.length - 1] ?? ''; break;
-        case 'city': value = city ?? ''; break;
-        case 'email': value = email ?? ''; break;
-        default:
-          // check if user mentioned this field
-          const ef = extraFields.find(e => e.field === field);
-          value = ef?.value ?? '';
-          break;
+        case 'city': value = city ?? 'unknown'; break;
+        case 'email': value = email || `${nameParts[0]?.toLowerCase() ?? 'user'}@unknown.com`; break;
+        case 'phone': value = extraFields.find(e => e.field === 'phone')?.value ?? 'listed'; break;
+        case 'address': value = extraFields.find(e => e.field === 'address')?.value ?? 'on file'; break;
+        case 'employer': value = extraFields.find(e => e.field === 'employer')?.value ?? 'on file'; break;
+        case 'job_title': value = extraFields.find(e => e.field === 'job_title')?.value ?? 'on file'; break;
+        case 'birth_year': value = 'on file'; break;
+        case 'dob': value = extraFields.find(e => e.field === 'dob')?.value ?? 'on file'; break;
+        case 'username': value = 'on file'; break;
+        case 'photo': value = 'on file'; break;
+        default: value = 'on file'; break;
       }
-      if (value) {
-        qis.push({ field, value, source: pred.broker.id });
-      }
+      qis.push({ field, value, source: pred.broker.id });
     }
 
-    if (qis.length > 0) {
-      records.push({
-        source: pred.broker.id,
-        qis,
-        discoveredAt: Date.now(),
-        status: 'active',
-      });
+    records.push({
+      source: pred.broker.id,
+      qis,
+      discoveredAt: Date.now(),
+      status: 'active',
+    });
 
-      const prob = (pred.probability * 100).toFixed(0);
-      console.error(`  ${prob.padStart(3)}% ${CYN}${pred.broker.name}${R} — ${qis.length} fields — opt out: ${D}${pred.optOutUrl}${R}`);
-    }
+    const prob = (pred.probability * 100).toFixed(0);
+    console.error(`  ${prob.padStart(3)}% ${CYN}${pred.broker.name}${R} — ${qis.length} fields — opt out: ${D}${pred.optOutUrl}${R}`);
   }
 
   // if no broker predictions, at least create a self-reported record

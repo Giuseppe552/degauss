@@ -88,6 +88,15 @@ function parseArgs(args: string[]): { command: string; flags: Record<string, str
   return { command, flags };
 }
 
+/** Only output JSON when --json flag is set or stdout is piped (not a TTY) */
+function jsonOut(data: any): void {
+  if (wantJson) {
+    console.log(JSON.stringify(data, null, 2));
+  }
+}
+
+let wantJson = false;
+
 function requireFlag(flags: Record<string, string>, key: string, label?: string): string {
   const v = flags[key];
   if (!v) {
@@ -213,7 +222,7 @@ async function cmdScan(flags: Record<string, string>): Promise<void> {
     console.error(`${D}  State saved to ${STATE_FILE}${R}`);
   }
 
-  console.log(JSON.stringify(records, null, 2));
+  jsonOut(records);
 }
 
 // ─── score ────────────────────────────────────────────────────────────
@@ -252,7 +261,7 @@ function cmdScore(flags: Record<string, string>): void {
     }
   }
 
-  console.log(JSON.stringify(report, null, 2));
+  jsonOut(report);
 }
 
 // ─── plan ─────────────────────────────────────────────────────────────
@@ -276,7 +285,7 @@ function cmdPlan(flags: Record<string, string>): void {
     console.error(`  ${B}${i + 1}.${R} ${CYN}${s.source}${R} — ${s.fields.join(', ')} — ${GRN}-${s.bitsReduced} bits${R} → anon set: ${s.anonymitySetAfter}`);
   }
 
-  console.log(JSON.stringify(report.removalPlan, null, 2));
+  jsonOut(report.removalPlan);
 }
 
 // ─── attacks ──────────────────────────────────────────────────────────
@@ -309,7 +318,7 @@ function cmdAttacks(flags: Record<string, string>): void {
     console.error();
   }
 
-  console.log(JSON.stringify({ summary, scenarios }, null, 2));
+  jsonOut({ summary, scenarios });
 }
 
 // ─── supply-chain ─────────────────────────────────────────────────────
@@ -340,13 +349,13 @@ function cmdSupplyChain(flags: Record<string, string>): void {
       }
     }
 
-    console.log(JSON.stringify(strategy, null, 2));
+    jsonOut(strategy);
   } else {
     // show the full graph
     const graph = getSupplyChain();
     console.error(`\n${B}Data Broker Supply Chain${R}`);
     console.error(`  ${graph.nodes.length} sources, ${graph.edges.length} data flows`);
-    console.log(JSON.stringify(graph, null, 2));
+    jsonOut(graph);
   }
 }
 
@@ -383,7 +392,7 @@ async function cmdBreaches(flags: Record<string, string>): Promise<void> {
     }
   }
 
-  console.log(JSON.stringify(result, null, 2));
+  jsonOut(result);
 }
 
 // ─── serp ─────────────────────────────────────────────────────────────
@@ -414,7 +423,7 @@ function cmdSerp(flags: Record<string, string>): void {
       console.error(`      ${D}${r.url.slice(0, 80)}${R}`);
     }
 
-    console.log(JSON.stringify(report, null, 2));
+    jsonOut(report);
   } else {
     console.error(`\n${B}SERP Analysis${R}`);
     console.error(`${D}─────────────────────────────────${R}`);
@@ -458,7 +467,7 @@ async function cmdArchive(flags: Record<string, string>): Promise<void> {
   }
 
   console.error(`\n  ${D}Total: ${report.zombies.length} zombies, ${report.clean.length} clean, ${report.totalSnapshots} snapshots${R}`);
-  console.log(JSON.stringify(report, null, 2));
+  jsonOut(report);
 }
 
 // ─── canary ───────────────────────────────────────────────────────────
@@ -485,7 +494,7 @@ function cmdCanary(flags: Record<string, string>): void {
   console.error(`${D}  When accessed, you'll know someone is researching you.${R}`);
   console.error(`${D}  Set up a webhook at ${domain} to receive trigger alerts.${R}`);
 
-  console.log(JSON.stringify(canaries, null, 2));
+  jsonOut(canaries);
 }
 
 // ─── request ──────────────────────────────────────────────────────────
@@ -660,7 +669,7 @@ async function cmdWatch(flags: Record<string, string>): Promise<void> {
   saveState(state);
   console.error(`\n${D}  State saved. Run this as a cron job: */6 * * * degauss watch --name "${state.profile.name}"${R}`);
 
-  console.log(JSON.stringify({ snapshot, alerts, delta: { new: delta.newRecords.length, removed: delta.removedRecords.length, reappeared: delta.reappearances.length } }, null, 2));
+  jsonOut({ snapshot, alerts, delta: { new: delta.newRecords.length, removed: delta.removedRecords.length, reappeared: delta.reappearances.length } });
 }
 
 // ─── history ──────────────────────────────────────────────────────────
@@ -688,7 +697,7 @@ function cmdHistory(_flags: Record<string, string>): void {
     console.error(`  ${s.date.slice(0, 10)} ${D}${bar}${R} ${s.totalBits.toFixed(1)} bits | anon: ${color}${s.anonymitySet}${R} | ${s.recordCount} records`);
   }
 
-  console.log(JSON.stringify({ trend, history: state.history }, null, 2));
+  jsonOut({ trend, history: state.history });
 }
 
 // ─── linkage ──────────────────────────────────────────────────────────
@@ -706,7 +715,7 @@ function cmdLinkage(flags: Record<string, string>): void {
   for (const f of result.fields) {
     console.error(`  ${f.agrees ? GRN + '\u2713' : RED + '\u2717'}${R} ${f.field.padEnd(15)} ${f.weight > 0 ? '+' : ''}${f.weight.toFixed(1)}`);
   }
-  console.log(JSON.stringify(result, null, 2));
+  jsonOut(result);
 }
 
 // ─── monitor (re-emergence predictions) ───────────────────────────────
@@ -720,7 +729,7 @@ function cmdMonitorPredict(flags: Record<string, string>): void {
     const est = predictReemergence(source, { dropCompliant: drop });
     console.error(`  ${CYN}${source}${R}: reappear in ~${est.expectedDaysUntilReappearance}d | P(90d)=${RED}${(est.probabilities.days90 * 100).toFixed(0)}%${R} | recheck every ${est.recheckInterval}d`);
   }
-  console.log(JSON.stringify(monitoringSchedule(sources, { dropCompliant: drop }), null, 2));
+  jsonOut(monitoringSchedule(sources, { dropCompliant: drop }));
 }
 
 // ─── dilute ───────────────────────────────────────────────────────────
@@ -741,7 +750,7 @@ function cmdDilute(flags: Record<string, string>): void {
   const gain = dilutionEntropyGain(1, k);
 
   console.error(`\n${B}Data Dilution${R}: k=${GRN}${k}${R}, +${GRN}${gain.toFixed(1)} bits${R} uncertainty`);
-  console.log(JSON.stringify({ k, entropyGain: gain, profiles }, null, 2));
+  jsonOut({ k, entropyGain: gain, profiles });
 }
 
 // ─── me (full pipeline) ───────────────────────────────────────────────
@@ -784,7 +793,7 @@ async function cmdMe(flags: Record<string, string>): Promise<void> {
     console.error(`    ${D}2. Search your name on spokeo.com, whitepages.com, beenverified.com${R}`);
     console.error(`    ${D}3. Create a profile JSON with what you find (see examples/sample-profile.json)${R}`);
     console.error(`    ${D}4. Run: degauss me --name "${name}" --profile your-profile.json${R}\n`);
-    console.log(JSON.stringify({ records: [], note: 'no broker records found — create a profile JSON or try --clearnet' }));
+    jsonOut({ records: [], note: 'no broker records found — create a profile JSON or try --clearnet' });
     return;
   }
   const profileRecords = flags.profile ? parseProfile(readJsonFile(flags.profile)) : records;
@@ -877,7 +886,7 @@ async function cmdMe(flags: Record<string, string>): Promise<void> {
   console.error(`${D}\n  State saved to ${STATE_FILE}`);
   console.error(`  Run 'degauss watch' to monitor changes over time${R}\n`);
 
-  console.log(JSON.stringify({ report, attacks: summary, supplyChain: leafBrokers.length > 0 ? computeUpstreamStrategy(leafBrokers) : null }, null, 2));
+  jsonOut({ report, attacks: summary, supplyChain: leafBrokers.length > 0 ? computeUpstreamStrategy(leafBrokers) : null });
 }
 
 // ─── init (interactive wizard) ─────────────────────────────────────────
@@ -934,7 +943,7 @@ async function cmdInit(flags: Record<string, string>): Promise<void> {
   console.error(`  degauss attacks                 — full attack surface analysis`);
   console.error(`  degauss supply-chain --sources ${result.records.map(r => r.source).join(',')}${R}\n`);
 
-  console.log(JSON.stringify(report, null, 2));
+  jsonOut(report);
 }
 
 // ─── predict (statistical coverage without scanning) ──────────────────
@@ -960,7 +969,7 @@ function cmdPredict(flags: Record<string, string>): void {
     console.error(`       ${D}Method: ${p.optOutMethod}${R}\n`);
   }
 
-  console.log(JSON.stringify({ predictions: predictions.filter(p => p.probability > 0.05), expected: exp }, null, 2));
+  jsonOut({ predictions: predictions.filter(p => p.probability > 0.05), expected: exp });
 }
 
 // ─── main ─────────────────────────────────────────────────────────────
@@ -972,6 +981,7 @@ if (args[0] === '--version' || args[0] === '-v') {
 }
 
 const { command, flags } = parseArgs(args);
+wantJson = flags.json === 'true';
 
 // async commands need top-level await wrapper
 const asyncCommands: Record<string, (f: Record<string, string>) => Promise<void>> = {
